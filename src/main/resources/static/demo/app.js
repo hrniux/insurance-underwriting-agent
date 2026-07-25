@@ -16,6 +16,7 @@ const state = {
   detailController: null,
   evaluationController: null,
   reviewController: null,
+  replayController: null,
   comparisonController: null,
   comparisonResults: [],
   scenarioFilter: "ALL",
@@ -111,6 +112,16 @@ const LABELS = {
     OVERRIDDEN: "推翻 Agent 建议",
     RESOLVED_MANUAL_REVIEW: "完成人工复核",
     CONTINUED_MANUAL_REVIEW: "继续补充资料"
+  },
+  driftSeverities: {
+    STABLE: "稳定",
+    SOURCE_DRIFT: "来源变化",
+    DECISION_DRIFT: "决策变化"
+  },
+  decisionChanges: {
+    UNCHANGED: "结论不变",
+    STRENGTHENED: "结论趋严",
+    WEAKENED: "结论趋松"
   }
 };
 
@@ -509,9 +520,12 @@ function renderEvidence(items) {
   setChildren(find("#evidence-list"), [section]);
 }
 
-function renderSourceSnapshot(modelResponse, evidenceItems) {
+function renderSourceSnapshot(evaluation) {
   const section = el("section", "result-section");
   const grid = el("div", "trace-grid");
+  const modelResponse = evaluation?.modelResponse;
+  const evidenceItems = Array.isArray(evaluation?.evidence) ? evaluation.evidence : [];
+  const ruleSet = evaluation?.ruleSet;
   const prompt = modelResponse?.prompt;
   const promptVersion = Number(prompt?.version) > 0 ? `v${prompt.version}` : "历史记录不可用";
   const fingerprint = prompt?.templateSha256 && prompt.templateSha256 !== "unavailable"
@@ -546,9 +560,75 @@ function renderSourceSnapshot(modelResponse, evidenceItems) {
     el("p", "result-card__meta", `${knowledgeVersions.length} 个文档版本`)
   );
 
-  grid.append(promptCard, modelCard, knowledgeCard);
+  const ruleCard = el("article", "trace-card");
+  const ruleFingerprint = ruleSet?.sha256 && ruleSet.sha256 !== "unavailable"
+    ? `${ruleSet.sha256.slice(0, 16)}…`
+    : "历史记录不可用";
+  ruleCard.append(
+    el("h4", null, "规则集快照"),
+    el("p", null, text(ruleSet?.version, "历史记录不可用")),
+    el("p", "result-card__meta", `${text(ruleSet?.ruleCount, "0")} 条规则 · SHA-256：${ruleFingerprint}`)
+  );
+
+  grid.append(promptCard, ruleCard, modelCard, knowledgeCard);
   section.append(el("h3", null, "决策来源快照"), grid);
   setChildren(find("#source-snapshot"), [section]);
+}
+
+function renderDecisionDrift(drift) {
+  const target = find("#decision-drift-result");
+  const summary = el("section", "drift-summary");
+  summary.dataset.severity = text(drift?.severity, "STABLE");
+  const heading = el("div", "drift-summary__heading");
+  heading.append(
+    el("span", "drift-badge", label("driftSeverities", drift?.severity)),
+    el("strong", null, label("decisionChanges", drift?.decisionChange))
+  );
+
+  const scoreDelta = Number(drift?.riskScoreDelta) || 0;
+  const metrics = el("div", "drift-metrics");
+  [
+    ["基线结论", label("decisions", drift?.baselineDecision)],
+    ["重演结论", label("decisions", drift?.replayDecision)],
+    ["风险分变化", `${scoreDelta > 0 ? "+" : ""}${scoreDelta}`],
+    ["规则变化", `+${drift?.addedRuleCodes?.length || 0} / -${drift?.removedRuleCodes?.length || 0}`],
+    ["证据变化", `+${drift?.addedEvidence?.length || 0} / -${drift?.removedEvidence?.length || 0}`]
+  ].forEach(([name, value]) => {
+    const item = el("div", "drift-metric");
+    item.append(el("span", null, name), el("strong", null, value));
+    metrics.append(item);
+  });
+
+  const explanations = el("ul", "drift-explanations");
+  const explanationItems = Array.isArray(drift?.explanations) && drift.explanations.length
+    ? drift.explanations
+    : ["服务未返回漂移解释。"];
+  explanations.append(...explanationItems.map(item => el("li", null, item)));
+
+  const sourceFlags = [
+    ["Prompt", drift?.promptChanged],
+    ["规则集", drift?.ruleSetChanged],
+    ["模型路由", drift?.modelChanged],
+    ["证据评分", Boolean(drift?.evidenceScoreChanges?.length)]
+  ];
+  const sourceRow = el("div", "drift-source-flags");
+  sourceRow.append(...sourceFlags.map(([name, changed]) => {
+    const item = el("span", "drift-source-flag", `${name}：${changed ? "有变化" : "无变化"}`);
+    item.dataset.changed = changed ? "true" : "false";
+    return item;
+  }));
+
+  summary.append(heading, metrics, sourceRow, explanations);
+  setChildren(target, [summary]);
+  target.hidden = false;
+  find("#decision-replay-status").textContent =
+    `重演完成：${label("driftSeverities", drift?.severity)}，基线 ${text(drift?.baselineEvaluationId)} → 重演 ${text(drift?.replayEvaluationId)}。`;
+}
+
+function clearDecisionDrift() {
+  find("#decision-replay-status").textContent = "尚未执行决策重演。";
+  find("#decision-drift-result").hidden = true;
+  find("#decision-drift-result").replaceChildren();
 }
 
 function renderStepTraces(items) {
@@ -926,13 +1006,14 @@ async function submitHumanReview(event) {
 
 function renderEvaluation(evaluation, expected, durationMs = 0, options = {}) {
   const { record = true, review = null } = options;
+  clearDecisionDrift();
   renderDecisionSummary(evaluation, expected);
   renderDegradations(Array.isArray(evaluation.degradations) ? evaluation.degradations : []);
   renderTextList("reason-list", "核保原因", evaluation.reasons);
   renderTextList("action-list", "建议动作", evaluation.recommendedActions);
   renderRuleHits(Array.isArray(evaluation.ruleHits) ? evaluation.ruleHits : []);
   const evidence = Array.isArray(evaluation.evidence) ? evaluation.evidence : [];
-  renderSourceSnapshot(evaluation.modelResponse, evidence);
+  renderSourceSnapshot(evaluation);
   renderEvidence(evidence);
   renderStepTraces(Array.isArray(evaluation.stepTraces) ? evaluation.stepTraces : []);
   renderToolTraces(Array.isArray(evaluation.toolTraces) ? evaluation.toolTraces : []);
@@ -946,11 +1027,55 @@ function renderEvaluation(evaluation, expected, durationMs = 0, options = {}) {
   configureReportDownload(evaluation.id);
   find("#copy-summary").disabled = false;
   find("#export-json").disabled = false;
+  find("#decision-replay-panel").hidden = false;
+  find("#run-decision-replay").disabled = false;
   activateResultTab("overview");
   find("#result-content").hidden = false;
   find("#evaluation-status").textContent = `核保完成，评估编号：${text(evaluation.id)}`;
   if (record) recordHistory(evaluation, durationMs);
   find("#result-content").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+async function runDecisionReplay() {
+  if (!state.evaluation || state.replayController) return;
+
+  const baseline = state.evaluation;
+  const controller = new AbortController();
+  state.replayController = controller;
+  const button = find("#run-decision-replay");
+  button.disabled = true;
+  button.textContent = "正在重演……";
+  find("#decision-replay-status").textContent =
+    "正在用当前业务事实、知识、Prompt、规则集和模型执行新的七步核保。";
+  find("#decision-drift-result").hidden = true;
+  clearError();
+
+  try {
+    const result = await requestJson(
+      `${EVALUATION_API}/${encodeURIComponent(baseline.id)}/replays`,
+      {
+        method: "POST",
+        signal: controller.signal,
+        headers: { "Idempotency-Key": `replay-${baseline.id}` }
+      }
+    );
+    if (state.replayController !== controller || state.evaluation?.id !== baseline.id) return;
+    state.evaluation = result.replay;
+    renderEvaluation(result.replay, state.detail?.expectedResult, 0);
+    renderDecisionDrift(result.drift);
+    find("#decision-drift-result").scrollIntoView({ behavior: "smooth", block: "center" });
+  } catch (error) {
+    if (error.name !== "AbortError") {
+      find("#decision-replay-status").textContent = `决策重演失败：${text(error.message)}`;
+      showError(error.message);
+    }
+  } finally {
+    if (state.replayController === controller) {
+      state.replayController = null;
+      button.disabled = false;
+      button.textContent = "再次重演当前决策";
+    }
+  }
 }
 
 function comparisonItem(scenario, evaluation, error = null, durationMs = 0) {
@@ -1118,6 +1243,8 @@ function resetEvaluation() {
   stopPipelineTimer();
   state.reviewController?.abort();
   state.reviewController = null;
+  state.replayController?.abort();
+  state.replayController = null;
   state.review = null;
   state.evaluation = null;
   state.lastDurationMs = 0;
@@ -1127,6 +1254,10 @@ function resetEvaluation() {
   find("#result-metrics").replaceChildren();
   find("#copy-summary").disabled = true;
   find("#export-json").disabled = true;
+  find("#decision-replay-panel").hidden = true;
+  find("#run-decision-replay").disabled = true;
+  find("#run-decision-replay").textContent = "重演当前决策";
+  clearDecisionDrift();
   find("#report-action").hidden = true;
   const reportLink = find("#download-report");
   reportLink.removeAttribute("href");
@@ -1324,6 +1455,7 @@ function handleGlobalShortcut(event) {
 applyTheme(preferredTheme());
 find("#run-evaluation").addEventListener("click", runEvaluation);
 find("#run-comparison").addEventListener("click", runComparison);
+find("#run-decision-replay").addEventListener("click", runDecisionReplay);
 find("#review-form").addEventListener("submit", submitHumanReview);
 find("#question-input").addEventListener("input", updateQuestionCount);
 find("#reset-question").addEventListener("click", resetQuestion);

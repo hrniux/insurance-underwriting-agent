@@ -94,11 +94,40 @@ flowchart LR
 
 RAG 命中转换为评估 `Evidence` 时不再丢弃检索解释，而是保留 `knowledgeVersion`、document/chunk ID、综合分、
 `vectorScore`、`lexicalScore`、`RetrievalMode` 和 `matchedTerms`。报告与演示台可以把一次结论追溯到实际 Prompt 版本、
-模型路由和具体知识版本。新增字段用可缺省类型兼容旧聚合 JSON；缺失来源归一化为 `version=0`、`UNKNOWN` 和
-`unavailable`，明确承认历史证据不足，而不是编造来源。
+模型路由和具体知识版本。`UnderwritingRuleEngine` 还暴露 `RuleSetSnapshot`：以规则集版本、基础分和全部规则规范化清单
+计算 SHA-256，因此即使某条规则本次没有命中，也仍属于当时决策来源。新增字段用可缺省类型兼容旧聚合 JSON；缺失来源
+归一化为 `version=0`、`ruleCount=0`、`UNKNOWN` 和 `unavailable`，明确承认历史证据不足，而不是编造来源。
 
 模板 SHA-256 是内容指纹，用于定位配置和发现意外变化，不是数字签名，也不能单独证明数据库未被篡改。生产环境还要
 把 Prompt、规则和知识发布事件写入只追加审计存储，并结合操作者身份、审批记录、时间戳签名和留存策略。
+
+### 4.2 决策重演与漂移分析
+
+`DecisionReplayService` 先只读取得基线评估，再创建一个带 `replayedFromEvaluationId` 的 `EvaluationRequest`。编排器在
+隔离的新会话中执行完整七步并保存新评估，不修改基线，也不把新消息追加到原会话。重演沿用
+`EvaluationSubmissionService` 的单飞幂等状态机；请求指纹包含基线编号，因此同一个键不能被错误复用于其他基线或普通评估。
+
+`DecisionDriftService` 是纯比较服务，不重新调用工具或模型。它对两个已保存评估执行以下确定性比较：
+
+1. 按 `APPROVE < MANUAL_REVIEW < REJECT` 判断结论不变、趋严或趋松；
+2. 计算风险分增量、风险等级变化和规则代码集合差；
+3. 用 `documentId + knowledgeVersion + chunkId` 对齐证据，找出新增/移除引用及共同引用的检索分数/解释变化；
+4. 比较 Prompt 快照、完整规则集快照以及模型 provider/model/fallback；
+5. 分类为 `STABLE`、`SOURCE_DRIFT` 或 `DECISION_DRIFT`，并生成可直接展示的中文解释。
+
+```mermaid
+flowchart LR
+    B["已保存基线评估"] --> R["POST /{id}/replays"]
+    R --> A["当前七步 Agent"]
+    A --> N["新评估<br/>replayedFromEvaluationId"]
+    B --> D["DecisionDriftService"]
+    N --> D
+    D --> C["结论、规则、证据与来源差异"]
+```
+
+`GET /{replayEvaluationId}/drift` 根据持久化的基线关联重新构建对比，不依赖浏览器会话。这里的“重演”是当前状态下的
+再评估，不是假装复现不可控的历史模型输出。严格历史复现还需要不可变业务事实快照、可寻址模型部署、版本化工具响应、
+规则/知识审批事件和只追加审计日志。
 
 ## 5. RAG 流程
 
@@ -208,7 +237,7 @@ stateDiagram-v2
 `TASK_EXECUTION_FAILED`，API 不返回堆栈和任意内部异常信息。
 
 `POST /api/v1/underwriting/evaluations` 可选接收 `Idempotency-Key`。提交服务对规范化后的
-`sessionId + policyNo + question` 计算 SHA-256 指纹，并用一个短临界区原子认领键：
+`sessionId + policyNo + question + replayedFromEvaluationId` 计算 SHA-256 指纹，并用一个短临界区原子认领键：
 
 - 首个请求成为 owner，执行一次七步 Agent；
 - 同键、同指纹的并发请求等待同一个 `CompletableFuture`，完成后直接重放同一评估；
@@ -227,6 +256,7 @@ stateDiagram-v2
 | `underwriting.evaluation.duration` | `outcome` | 包含并发等待时间的 API 提交耗时 |
 | `underwriting.evaluation.decisions` | `decision`、`risk_level` | 实际执行生成的结论分布，不重复统计重放请求 |
 | `underwriting.agent.degradations` | `tool`、`reason` | 实际执行发生的安全降级；重放请求不重复统计 |
+| `underwriting.decision.replays` | `severity`、`outcome` | 决策重演的稳定/来源漂移/决策漂移分布，以及创建/幂等重放次数 |
 | `underwriting.task.submissions` | `outcome` | `accepted`、`replayed`、`conflict`、`rejected`、`failed` 任务提交数 |
 | `underwriting.task.transitions` | `status` | `running`、`succeeded`、`failed` 状态转换数 |
 | `underwriting.task.duration` | `outcome` | 后台任务从运行到成功/失败的耗时 |

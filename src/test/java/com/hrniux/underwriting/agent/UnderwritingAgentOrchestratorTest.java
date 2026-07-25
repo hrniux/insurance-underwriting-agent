@@ -74,6 +74,10 @@ class UnderwritingAgentOrchestratorTest {
         assertThat(evaluation.modelResponse().prompt().code()).isEqualTo("underwriting-analysis");
         assertThat(evaluation.modelResponse().prompt().version()).isPositive();
         assertThat(evaluation.modelResponse().prompt().templateSha256()).matches("[0-9a-f]{64}");
+        assertThat(evaluation.ruleSet().version()).isEqualTo("property-underwriting-default-v1");
+        assertThat(evaluation.ruleSet().ruleCount()).isEqualTo(5);
+        assertThat(evaluation.ruleSet().sha256()).matches("[0-9a-f]{64}");
+        assertThat(evaluation.replayedFromEvaluationId()).isNull();
         assertThat(evaluation.decision().ordinal()).isGreaterThanOrEqualTo(Decision.MANUAL_REVIEW.ordinal());
         assertThat(orchestrator.getEvaluation(evaluation.id())).isEqualTo(evaluation);
         assertThat(sessions.getSession(evaluation.sessionId()).messages())

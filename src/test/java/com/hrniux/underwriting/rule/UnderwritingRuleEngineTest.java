@@ -83,6 +83,17 @@ class UnderwritingRuleEngineTest {
                 .containsExactly("CRITICAL_FIRE_DEFECT");
     }
 
+    @Test
+    void exposesAStableVersionedFingerprintForTheCompleteRuleSet() {
+        RuleSetSnapshot snapshot = engine.snapshot();
+
+        assertThat(snapshot.version()).isEqualTo("property-underwriting-default-v1");
+        assertThat(snapshot.ruleCount()).isEqualTo(5);
+        assertThat(snapshot.sha256()).matches("[0-9a-f]{64}");
+        assertThat(snapshot.available()).isTrue();
+        assertThat(new UnderwritingRuleEngine().snapshot()).isEqualTo(snapshot);
+    }
+
     private UnderwritingContext context(String policyNo) {
         return new UnderwritingContext(
                 facts.getPolicy(policyNo),

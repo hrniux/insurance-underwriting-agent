@@ -50,7 +50,7 @@ public class UnderwritingMarkdownReportService {
         appendEvidence(report, evaluation.evidence());
         appendSteps(report, evaluation.stepTraces());
         appendTools(report, evaluation.toolTraces());
-        appendModel(report, evaluation.modelResponse());
+        appendModel(report, evaluation);
         return report.append("## 免责声明\n\n")
                 .append("本报告仅用于技术学习和面试演示，不构成真实保险核保意见。")
                 .append("报告中的业务数据、规则阈值和条款均为虚构内容。\n")
@@ -68,6 +68,8 @@ public class UnderwritingMarkdownReportService {
         appendRow(report, "保单号", evaluation.policyNo());
         appendRow(report, "核保问题", evaluation.question());
         appendRow(report, "评估时间（UTC）", evaluation.createdAt());
+        appendRow(report, "决策重演基线",
+                evaluation.replay() ? code(evaluation.replayedFromEvaluationId()) : "非重演评估");
         report.append('\n');
     }
 
@@ -226,7 +228,8 @@ public class UnderwritingMarkdownReportService {
         report.append('\n');
     }
 
-    private void appendModel(StringBuilder report, ModelResponse response) {
+    private void appendModel(StringBuilder report, UnderwritingEvaluation evaluation) {
+        ModelResponse response = evaluation.modelResponse();
         report.append("## 模型执行信息\n\n")
                 .append("| 字段 | 内容 |\n")
                 .append("|---|---|\n");
@@ -239,6 +242,12 @@ public class UnderwritingMarkdownReportService {
                 response.prompt().available() ? "v" + response.prompt().version() : "历史记录不可用");
         appendRow(report, "模板 SHA-256",
                 response.prompt().available() ? code(response.prompt().templateSha256()) : "历史记录不可用");
+        appendRow(report, "规则集版本",
+                evaluation.ruleSet().available() ? code(evaluation.ruleSet().version()) : "历史记录不可用");
+        appendRow(report, "规则集 SHA-256",
+                evaluation.ruleSet().available() ? code(evaluation.ruleSet().sha256()) : "历史记录不可用");
+        appendRow(report, "规则数量",
+                evaluation.ruleSet().available() ? evaluation.ruleSet().ruleCount() : "历史记录不可用");
         report.append('\n');
     }
 

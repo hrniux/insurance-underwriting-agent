@@ -122,6 +122,17 @@ class PersistentDemoProfileIntegrationTest {
                 .andReturn().getResponse().getContentAsString();
         String evaluationId = JsonPath.read(evaluationJson, "$.id");
 
+        String replayJson = mvc.perform(post(
+                            "/api/v1/underwriting/evaluations/{id}/replays",
+                            evaluationId)
+                        .header("Idempotency-Key", "persistent-replay-" + evaluationId))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.replay.replayedFromEvaluationId").value(evaluationId))
+                .andExpect(jsonPath("$.replay.ruleSet.version").value("property-underwriting-default-v1"))
+                .andExpect(jsonPath("$.drift.severity").value("STABLE"))
+                .andReturn().getResponse().getContentAsString();
+        String replayId = JsonPath.read(replayJson, "$.replay.id");
+
         String reviewPath = "/api/v1/underwriting/evaluations/" + evaluationId + "/review";
         mvc.perform(post(reviewPath)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -136,8 +147,8 @@ class PersistentDemoProfileIntegrationTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.relationship").value("RESOLVED_MANUAL_REVIEW"));
 
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM underwriting_session", Integer.class)).isEqualTo(1);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM underwriting_evaluation", Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM underwriting_session", Integer.class)).isEqualTo(2);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM underwriting_evaluation", Integer.class)).isEqualTo(2);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM underwriting_human_review", Integer.class)).isEqualTo(1);
         assertThat(sessions.findById(sessionId)).isPresent().get()
                 .extracting(session -> session.messages().size()).isEqualTo(2);
@@ -146,10 +157,18 @@ class PersistentDemoProfileIntegrationTest {
                     assertThat(evaluation.policyNo()).isEqualTo("P-1001");
                     assertThat(evaluation.modelResponse().prompt().code()).isEqualTo("underwriting-analysis");
                     assertThat(evaluation.modelResponse().prompt().version()).isPositive();
+                    assertThat(evaluation.ruleSet().version()).isEqualTo("property-underwriting-default-v1");
+                    assertThat(evaluation.ruleSet().ruleCount()).isEqualTo(5);
                     assertThat(evaluation.evidence()).allSatisfy(evidence -> {
                         assertThat(evidence.knowledgeVersion()).isPositive();
                         assertThat(evidence.retrievalMode()).isNotNull();
                     });
+                });
+        assertThat(evaluations.findById(replayId)).isPresent().get()
+                .satisfies(replay -> {
+                    assertThat(replay.replayedFromEvaluationId()).isEqualTo(evaluationId);
+                    assertThat(replay.sessionId()).isNotEqualTo(sessionId);
+                    assertThat(replay.ruleSet().available()).isTrue();
                 });
         assertThat(reviews.findByEvaluationId(evaluationId)).isPresent().get()
                 .extracting(review -> review.reviewerId()).isEqualTo("UW-PERSISTENCE-TEST");
@@ -160,6 +179,10 @@ class PersistentDemoProfileIntegrationTest {
         mvc.perform(get("/api/v1/underwriting/evaluations/{id}", evaluationId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.policyNo").value("P-1001"));
+        mvc.perform(get("/api/v1/underwriting/evaluations/{id}/drift", replayId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.baselineEvaluationId").value(evaluationId))
+                .andExpect(jsonPath("$.severity").value("STABLE"));
         mvc.perform(get(reviewPath))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.reviewerId").value("UW-PERSISTENCE-TEST"));

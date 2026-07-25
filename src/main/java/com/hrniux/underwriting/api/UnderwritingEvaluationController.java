@@ -16,6 +16,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.hrniux.underwriting.agent.EvaluationSubmissionResult;
 import com.hrniux.underwriting.agent.EvaluationSubmissionService;
+import com.hrniux.underwriting.agent.DecisionDrift;
+import com.hrniux.underwriting.agent.DecisionReplayResult;
+import com.hrniux.underwriting.agent.DecisionReplayService;
 import com.hrniux.underwriting.agent.UnderwritingAgentOrchestrator;
 import com.hrniux.underwriting.agent.UnderwritingEvaluation;
 import com.hrniux.underwriting.api.ApiDtos.EvaluationApiRequest;
@@ -32,16 +35,19 @@ public class UnderwritingEvaluationController {
     private final EvaluationSubmissionService submissions;
     private final UnderwritingMarkdownReportService reportService;
     private final HumanReviewService reviews;
+    private final DecisionReplayService replays;
 
     public UnderwritingEvaluationController(
             UnderwritingAgentOrchestrator orchestrator,
             EvaluationSubmissionService submissions,
             UnderwritingMarkdownReportService reportService,
-            HumanReviewService reviews) {
+            HumanReviewService reviews,
+            DecisionReplayService replays) {
         this.orchestrator = orchestrator;
         this.submissions = submissions;
         this.reportService = reportService;
         this.reviews = reviews;
+        this.replays = replays;
     }
 
     @PostMapping
@@ -76,5 +82,26 @@ public class UnderwritingEvaluationController {
     @GetMapping
     public List<UnderwritingEvaluation> list() {
         return orchestrator.listEvaluations();
+    }
+
+    @PostMapping("/{evaluationId}/replays")
+    public ResponseEntity<DecisionReplayResult> replay(
+            @PathVariable String evaluationId,
+            @RequestHeader(name = EvaluationSubmissionService.IDEMPOTENCY_HEADER, required = false)
+            String idempotencyKey) {
+        DecisionReplayResult result = replays.replay(evaluationId, idempotencyKey);
+        ResponseEntity.BodyBuilder response = result.idempotencyReplayed()
+                ? ResponseEntity.ok()
+                : ResponseEntity.created(URI.create(
+                        "/api/v1/underwriting/evaluations/" + result.replay().id()));
+        return response.header(
+                        EvaluationSubmissionService.REPLAY_HEADER,
+                        Boolean.toString(result.idempotencyReplayed()))
+                .body(result);
+    }
+
+    @GetMapping("/{evaluationId}/drift")
+    public DecisionDrift drift(@PathVariable String evaluationId) {
+        return replays.drift(evaluationId);
     }
 }

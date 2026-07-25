@@ -123,18 +123,62 @@ curl -sS -X POST "$BASE_URL/api/v1/underwriting/evaluations" \
       "version": 1,
       "templateSha256": "64位小写十六进制模板指纹"
     }
+  },
+  "ruleSet": {
+    "version": "property-underwriting-default-v1",
+    "sha256": "64位小写十六进制规则集指纹",
+    "ruleCount": 5
   }
 }
 ```
 
 `templateSha256` 对模板正文计算，不包含渲染后注入的保单事实。完整渲染 Prompt 只传给模型网关，不写入评估响应或
-持久化 JSON。`persistent-demo` 可以读取升级前记录；旧记录缺少的 Prompt/知识来源字段会返回
-`version=0`、`UNKNOWN` 或 `unavailable`，明确表示历史来源不可用。
+持久化 JSON。`ruleSet.sha256` 对规则集版本、基础分和全部规则规范化清单计算，不只是本次命中规则。`persistent-demo`
+可以读取升级前记录；旧记录缺少的 Prompt/规则集/知识来源字段会返回 `version=0`、`ruleCount=0`、`UNKNOWN` 或
+`unavailable`，明确表示历史来源不可用。
 
 ```bash
 curl -sS "$BASE_URL/api/v1/underwriting/evaluations/EVAL-替换为返回值" | python3 -m json.tool
 curl -sS "$BASE_URL/api/v1/underwriting/evaluations" | python3 -m json.tool
 ```
+
+### 决策重演与漂移分析 `/{evaluationId}/replays`
+
+先创建并保存一次评估，把编号放入 `baseline_id`，再用当前业务事实、知识、Prompt、规则集和模型重新运行：
+
+```bash
+baseline_id='EVAL-替换为真实编号'
+replay_json=$(curl -sS --fail-with-body -X POST \
+  "$BASE_URL/api/v1/underwriting/evaluations/${baseline_id}/replays" \
+  -H "Idempotency-Key: replay-${baseline_id}")
+printf '%s' "$replay_json" | python3 -m json.tool
+replay_id=$(printf '%s' "$replay_json" \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["replay"]["id"])')
+```
+
+响应包含三个核心对象：
+
+- `baseline`：完全不修改的历史评估；
+- `replay`：新保存的评估，`replayedFromEvaluationId` 指向基线，并使用隔离的新会话；
+- `drift`：结构化差异，包括 `decisionChange`、`riskScoreDelta`、增加/移除规则、增加/移除证据、共同证据分数变化，
+  以及 `promptChanged`、`ruleSetChanged`、`modelChanged`。
+
+`drift.severity` 只有三个低基数值：完全一致为 `STABLE`；结论/风险分/规则不变、但 Prompt/规则集/模型/证据发生变化
+为 `SOURCE_DRIFT`；结论、风险等级/分数或规则命中变化为 `DECISION_DRIFT`。`decisionChange=WEAKENED` 表示重演结论
+比基线更宽松，应重点复核变化依据。
+
+相同 `Idempotency-Key` 和同一基线再次提交返回原重演评估、HTTP `200` 和
+`Idempotency-Replayed: true`；同键用于其他基线或普通评估会返回 `409`。重演结果可在以后重新读取差异：
+
+```bash
+curl -sS "$BASE_URL/api/v1/underwriting/evaluations/${replay_id}/drift" \
+  | python3 -m json.tool
+curl -sS "$BASE_URL/actuator/metrics/underwriting.decision.replays" \
+  | python3 -m json.tool
+```
+
+对普通评估调用 `/{evaluationId}/drift` 返回 `400 EVALUATION_NOT_REPLAY`。重演的语义是“使用当前依赖重新评估并解释差异”，
+不是复现历史随机模型文本；如果要做严格历史复现，还必须持久化当时业务事实快照并使用可寻址模型版本。
 
 ### Actuator 运行指标
 

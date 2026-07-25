@@ -64,6 +64,10 @@ class UnderwritingApiIntegrationTest {
                 .andExpect(jsonPath("$.modelResponse.prompt.code").value("underwriting-analysis"))
                 .andExpect(jsonPath("$.modelResponse.prompt.version").value(greaterThan(0)))
                 .andExpect(jsonPath("$.modelResponse.prompt.templateSha256").isNotEmpty())
+                .andExpect(jsonPath("$.ruleSet.version").value("property-underwriting-default-v1"))
+                .andExpect(jsonPath("$.ruleSet.ruleCount").value(5))
+                .andExpect(jsonPath("$.ruleSet.sha256").isNotEmpty())
+                .andExpect(jsonPath("$.replayedFromEvaluationId").doesNotExist())
                 .andExpect(jsonPath("$.toolTraces.length()").value(6))
                 .andExpect(jsonPath("$.stepTraces.length()").value(7))
                 .andReturn().getResponse().getContentAsString();
@@ -98,6 +102,8 @@ class UnderwritingApiIntegrationTest {
                 .andExpect(content().string(containsString("知识版本")))
                 .andExpect(content().string(containsString("提示词版本")))
                 .andExpect(content().string(containsString("模板 SHA-256")))
+                .andExpect(content().string(containsString("规则集版本")))
+                .andExpect(content().string(containsString("规则集 SHA-256")))
                 .andExpect(content().string(containsString("本报告仅用于技术学习和面试演示")));
     }
 
@@ -172,6 +178,62 @@ class UnderwritingApiIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").value("INVALID_IDEMPOTENCY_KEY"))
                 .andExpect(jsonPath("$.traceId").isNotEmpty());
+    }
+
+    @Test
+    void replaysASavedDecisionAndReturnsAnIdempotentStructuredDriftAnalysis() throws Exception {
+        String baselineJson = mvc.perform(post("/api/v1/underwriting/evaluations")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"policyNo":"P-3001","question":"重新检查这张暴雨风险保单。"}
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        String baselineId = JsonPath.read(baselineJson, "$.id");
+        String key = "decision-replay-" + UUID.randomUUID();
+
+        String replayJson = mvc.perform(post(
+                            "/api/v1/underwriting/evaluations/{id}/replays",
+                            baselineId)
+                        .header("Idempotency-Key", key))
+                .andExpect(status().isCreated())
+                .andExpect(header().string("Idempotency-Replayed", "false"))
+                .andExpect(header().string(HttpHeaders.LOCATION, containsString("/api/v1/underwriting/evaluations/")))
+                .andExpect(jsonPath("$.baseline.id").value(baselineId))
+                .andExpect(jsonPath("$.replay.replayedFromEvaluationId").value(baselineId))
+                .andExpect(jsonPath("$.replay.ruleSet.version").value("property-underwriting-default-v1"))
+                .andExpect(jsonPath("$.drift.baselineEvaluationId").value(baselineId))
+                .andExpect(jsonPath("$.drift.decisionChange").value("UNCHANGED"))
+                .andExpect(jsonPath("$.drift.riskScoreDelta").value(0))
+                .andExpect(jsonPath("$.drift.severity").value("STABLE"))
+                .andExpect(jsonPath("$.drift.promptChanged").value(false))
+                .andExpect(jsonPath("$.drift.ruleSetChanged").value(false))
+                .andExpect(jsonPath("$.drift.modelChanged").value(false))
+                .andExpect(jsonPath("$.idempotencyReplayed").value(false))
+                .andReturn().getResponse().getContentAsString();
+        String replayId = JsonPath.read(replayJson, "$.replay.id");
+
+        mvc.perform(post("/api/v1/underwriting/evaluations/{id}/replays", baselineId)
+                        .header("Idempotency-Key", key))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Idempotency-Replayed", "true"))
+                .andExpect(jsonPath("$.replay.id").value(replayId))
+                .andExpect(jsonPath("$.idempotencyReplayed").value(true));
+
+        mvc.perform(get("/api/v1/underwriting/evaluations/{id}/drift", replayId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.baselineEvaluationId").value(baselineId))
+                .andExpect(jsonPath("$.replayEvaluationId").value(replayId))
+                .andExpect(jsonPath("$.severity").value("STABLE"));
+
+        mvc.perform(get("/api/v1/underwriting/evaluations/{id}/drift", baselineId))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("EVALUATION_NOT_REPLAY"));
+
+        mvc.perform(get("/actuator/metrics/underwriting.decision.replays"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.availableTags[?(@.tag == 'severity')]").exists())
+                .andExpect(jsonPath("$.availableTags[?(@.tag == 'outcome')]").exists());
     }
 
     @Test

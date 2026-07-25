@@ -35,6 +35,7 @@ public final class EvaluationIdempotency {
             update(digest, request.sessionId());
             update(digest, request.policyNo());
             update(digest, request.question());
+            update(digest, request.replayedFromEvaluationId());
             return HexFormat.of().formatHex(digest.digest());
         }
         catch (NoSuchAlgorithmException impossible) {

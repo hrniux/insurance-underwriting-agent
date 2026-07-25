@@ -16,7 +16,7 @@
 
 ### 第 2–3 分钟：展开一组规则、RAG 与轨迹
 
-进入 `P-1001`，点击“运行智能核保”，展示 70 分、四条规则、四条知识证据、决策来源快照、七步 Agent 轨迹和六类工具调用。指出 Prompt vN/SHA-256、知识 vN、向量/词法分回答了“当时用了什么”，规则结果不能被模型文本降低。随后提交一条“同意附条件承保”的人工复核，最后下载 Markdown 报告，展示 Agent 原始建议与人工最终处置如何形成可审计交付物。
+进入 `P-1001`，点击“运行智能核保”，展示 70 分、四条规则、四条知识证据、决策来源快照、七步 Agent 轨迹和六类工具调用。指出 Prompt vN/SHA-256、完整规则集 vN/SHA-256、知识 vN 和向量/词法分回答了“当时用了什么”，规则结果不能被模型文本降低。点击“重演当前决策”，说明默认确定性场景应为 `STABLE`，而生产变更可区分来源漂移与决策漂移。随后提交一条“同意附条件承保”的人工复核，最后下载 Markdown 报告，展示 Agent 原始建议与人工最终处置如何形成可审计交付物。
 
 ### 第 3–4 分钟：说明 REST、MCP 与模型边界
 
@@ -24,7 +24,7 @@
 
 ### 第 4–5 分钟：讲可靠性与生产化
 
-提交一次异步任务，说明 `202 + Location`、四态状态机、有界线程池/队列和任务级 `Idempotency-Key`；可切换 `degraded-demo` Profile 展示灾害平台超时后仍保持人工复核底线，再切到 `persistent-demo` 说明仓储端口不变、重启后仍能读到评估与复核。展示九组 Actuator 指标后，给出工作流引擎、Redis、PostgreSQL/PGVector、真实内部 API、企业模型和 OpenTelemetry 的替换路径。
+提交一次异步任务，说明 `202 + Location`、四态状态机、有界线程池/队列和任务级 `Idempotency-Key`；可切换 `degraded-demo` Profile 展示灾害平台超时后仍保持人工复核底线，再切到 `persistent-demo` 说明仓储端口不变、重启后仍能读到评估、重演关联与复核。展示评估、重演、异步任务和人工复核 Actuator 指标后，给出工作流引擎、Redis、PostgreSQL/PGVector、真实内部 API、企业模型和 OpenTelemetry 的替换路径。
 
 ## 简历职责如何映射到代码
 
@@ -37,6 +37,7 @@
 | 规则校验与可解释决策 | `UnderwritingRuleEngine`、`RuleEvaluation`、步骤/工具 Trace |
 | 可审计中文结果交付 | `UnderwritingMarkdownReportService`、`GET /api/v1/underwriting/evaluations/{evaluationId}/report` |
 | Prompt 与知识来源追溯 | `RenderedPrompt`、`PromptSnapshot`、增强 `Evidence`、演示台“决策来源快照” |
+| 规则集追溯与决策漂移 | `RuleSetSnapshot`、`DecisionReplayService`、`DecisionDriftService`、重演 REST/工作台 |
 | 幂等、并发单飞与运行指标 | `EvaluationSubmissionService`、`Idempotency-Key`、Actuator Metrics |
 | 内部系统故障分级与安全降级 | `ToolCriticality`、`ToolAttempt`、`DegradationNotice`、`degraded-demo` Profile |
 | 人工复核与 Agent 效果反馈闭环 | `HumanReviewService`、`HumanReviewRepository`、Review API、人工复核指标 |
@@ -131,20 +132,30 @@ Demo 同时保留余弦分数和 BM25 分数，用固定权重融合，并返回
 审批人、RBAC、双人复核、生效日期和数据库事务；生产会把版本和审批保存在 PostgreSQL，通过 Outbox/索引任务及
 索引别名切换解决数据库与向量库一致性，不能把单实例 `synchronized` 当成分布式发布事务。
 
-### Q20：如何证明一次核保建议使用了哪版 Prompt 和哪版知识？
+### Q20：如何证明一次核保建议使用了哪版 Prompt、规则和知识？
 
 Prompt 渲染不是先取字符串、事后再查版本，而是一次读取激活模板，同时返回渲染内容与 `PromptSnapshot`，其中保存
 代码、版本和模板正文 SHA-256。模型网关把这份快照原样写进 `ModelResponse`；完整渲染 Prompt 不落库，避免为了
-审计扩大敏感业务事实的保存范围。每条证据继续保存知识版本、document/chunk ID、融合/向量/词法分、检索模式和
-命中词，所以能从评估结果回到具体 Prompt vN 和知识 vN。SHA-256 只是内容指纹，不是防篡改签名；生产还需要
-只追加审计日志、操作者身份、审批链、规则版本、可信时间戳和签名校验。旧 JSON 没有这些字段时明确标记“历史记录不可用”。
+审计扩大敏感业务事实的保存范围。规则引擎对版本、基础分和全部五条规则规范化清单计算 `RuleSetSnapshot`，所以没有
+命中的规则也属于可验证来源；每条证据继续保存知识版本、document/chunk ID、融合/向量/词法分、检索模式和命中词。
+因此能从评估结果回到具体 Prompt vN、完整规则集 vN/SHA-256 和知识 vN。SHA-256 只是内容指纹，不是防篡改签名；
+生产还需要只追加审计日志、操作者身份、审批链、可信时间戳和签名校验。旧 JSON 没有这些字段时明确标记“历史记录不可用”。
+
+### Q21：决策重演和普通重试有什么区别，如何发现决策漂移？
+
+普通重试在相同 `Idempotency-Key` 下返回原评估，目标是避免重复副作用；决策重演则明确创建一个关联到基线的新评估，
+用当前事实、知识、Prompt、规则集和模型重新执行，再由纯比较服务计算结论强弱、风险分、规则集合、知识引用/分数和
+来源快照变化。新评估使用隔离会话，不污染原对话；请求指纹包含基线编号，同键不能串到其他基线。完全一致是
+`STABLE`，只有来源变化是 `SOURCE_DRIFT`，结论/风险/规则变化是 `DECISION_DRIFT`。它回答“今天重新评估发生了什么”，
+不是虚假承诺复现历史随机模型文本；严格历史回放仍需不可变事实快照和可寻址模型部署。
 
 ## 容易被追问的取舍
 
 - Hash Embedding 是演示替身，不应包装成生产语义模型。
 - 混合分数在单次候选集内归一化，只用于排序，不是概率；内置两条黄金问题也不代表真实业务质量。
 - 知识版本状态机和原子索引替换是真实实现，但版本仍在内存中，也没有审批身份、RBAC、生效日期或跨系统事务。
-- Prompt/知识来源快照能定位版本和内容指纹，但不是数字签名，也没有只追加审计库、审批身份或规则集版本快照。
+- Prompt/规则集/知识来源快照能定位版本和内容指纹，但不是数字签名，也没有只追加审计库或审批身份。
+- 决策重演使用当前业务工具返回值，适合发现当前漂移；没有不可变事实快照时不能等同于严格历史复现。
 - 默认仓库是内存实现；可选 H2 Profile 能演示重启恢复，但不是生产数据库架构。
 - H2 Profile 尚未覆盖知识库、Prompt 和幂等注册表，也没有生产级迁移、跨聚合事务或多节点协调。
 - 异步任务状态和任务幂等仍在单实例内存中；进程退出时不会恢复排队/运行任务，也没有取消与自动补偿。

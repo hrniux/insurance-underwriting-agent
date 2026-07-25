@@ -1658,6 +1658,135 @@ kbd {
   color: var(--navy);
 }
 
+.decision-replay-panel {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: linear-gradient(120deg, rgba(18, 63, 78, 0.06), rgba(8, 127, 120, 0.08));
+  border: 1px solid var(--line-strong);
+  border-radius: 0.85rem;
+}
+
+.decision-replay-action,
+.drift-summary__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.decision-replay-action > div {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.decision-replay-action strong {
+  color: var(--navy);
+}
+
+.decision-replay-action p,
+#decision-replay-status {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+#decision-replay-status {
+  margin-top: 0.65rem;
+}
+
+.drift-summary {
+  margin-top: 0.9rem;
+  padding: 0.9rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--approve);
+  border-radius: 0.7rem;
+}
+
+.drift-summary[data-severity="SOURCE_DRIFT"] {
+  border-left-color: var(--review);
+}
+
+.drift-summary[data-severity="DECISION_DRIFT"] {
+  border-left-color: var(--reject);
+}
+
+.drift-badge {
+  padding: 0.3rem 0.55rem;
+  color: var(--approve);
+  background: var(--approve-soft);
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 850;
+}
+
+.drift-summary[data-severity="SOURCE_DRIFT"] .drift-badge {
+  color: var(--review);
+  background: var(--review-soft);
+}
+
+.drift-summary[data-severity="DECISION_DRIFT"] .drift-badge {
+  color: var(--reject);
+  background: var(--reject-soft);
+}
+
+.drift-metrics {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(100px, 1fr));
+  gap: 0.55rem;
+  margin-top: 0.75rem;
+}
+
+.drift-metric {
+  padding: 0.65rem;
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  border-radius: 0.55rem;
+}
+
+.drift-metric span,
+.drift-metric strong {
+  display: block;
+}
+
+.drift-metric span {
+  color: var(--muted);
+  font-size: 0.67rem;
+}
+
+.drift-metric strong {
+  margin-top: 0.15rem;
+  font-size: 0.86rem;
+}
+
+.drift-source-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.7rem;
+}
+
+.drift-source-flag {
+  padding: 0.25rem 0.45rem;
+  color: var(--muted);
+  background: var(--surface-soft);
+  border-radius: 0.35rem;
+  font-size: 0.7rem;
+  font-weight: 750;
+}
+
+.drift-source-flag[data-changed="true"] {
+  color: var(--review);
+  background: var(--review-soft);
+}
+
+.drift-explanations {
+  margin: 0.75rem 0 0;
+  padding-left: 1.15rem;
+  color: var(--ink);
+  font-size: 0.8rem;
+}
+
 .toast {
   position: fixed;
   z-index: 100;
@@ -1791,6 +1920,15 @@ kbd {
 
   .evaluation-action {
     flex-direction: column;
+  }
+
+  .decision-replay-action {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .drift-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   #run-evaluation {

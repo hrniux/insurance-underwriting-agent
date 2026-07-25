@@ -21,6 +21,7 @@ import com.hrniux.underwriting.rag.RetrievalMode;
 import com.hrniux.underwriting.rule.Decision;
 import com.hrniux.underwriting.rule.RiskLevel;
 import com.hrniux.underwriting.rule.RuleResult;
+import com.hrniux.underwriting.rule.RuleSetSnapshot;
 import com.hrniux.underwriting.rule.RuleSeverity;
 import com.hrniux.underwriting.review.AgentReviewRelationship;
 import com.hrniux.underwriting.review.HumanReview;
@@ -86,7 +87,13 @@ class UnderwritingMarkdownReportServiceTest {
                 "提示词版本",
                 "v3",
                 "模板 SHA-256",
-                "`" + "a".repeat(64) + "`");
+                "`" + "a".repeat(64) + "`",
+                "规则集版本",
+                "`property-underwriting-default-v1`",
+                "规则集 SHA-256",
+                "`" + "b".repeat(64) + "`",
+                "规则数量",
+                "5");
     }
 
     @Test
@@ -162,7 +169,9 @@ class UnderwritingMarkdownReportServiceTest {
                         1,
                         false,
                         new PromptSnapshot("underwriting-analysis", 3, "a".repeat(64))),
-                timestamp);
+                timestamp,
+                new RuleSetSnapshot("property-underwriting-default-v1", "b".repeat(64), 5),
+                null);
     }
 
     private UnderwritingEvaluation evaluationWithoutAuditDetails() {

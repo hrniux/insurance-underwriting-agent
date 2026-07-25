@@ -243,7 +243,7 @@ class DocumentationContractTest {
                 "AgentReviewRelationship",
                 "为什么人工复核不能再次覆盖");
         assertThat(read("scripts/demo.sh")).contains(
-                "[7/10] 人工复核反馈闭环",
+                "[8/11] 人工复核反馈闭环",
                 "underwriting.human.reviews");
     }
 
@@ -320,7 +320,7 @@ class DocumentationContractTest {
                 "版本化、脱敏、有代表性的标注集",
                 "一次 Demo 的 `passed=true`");
         assertThat(read("scripts/demo.sh")).contains(
-                "[4/10] RAG 黄金问题集离线评测",
+                "[4/11] RAG 黄金问题集离线评测",
                 "/api/v1/knowledge/evaluations",
                 "RAG 质量门禁未通过");
     }
@@ -352,33 +352,69 @@ class DocumentationContractTest {
     }
 
     @Test
-    void documentsThePromptAndKnowledgeDecisionProvenanceSnapshot() throws IOException {
+    void documentsThePromptRuleSetAndKnowledgeDecisionProvenanceSnapshot() throws IOException {
         assertThat(read("README.md")).contains(
                 "决策来源快照",
                 "PromptSnapshot",
+                "规则集 vN/SHA-256",
                 "模板 SHA-256",
                 "历史记录不可用");
         assertThat(read("docs/ARCHITECTURE.md")).contains(
                 "PromptTemplateService.render",
+                "RuleSetSnapshot",
                 "knowledgeVersion",
                 "vectorScore",
                 "matchedTerms",
                 "不是数字签名");
         assertThat(read("docs/API_EXAMPLES.md")).contains(
                 "templateSha256",
+                "ruleSet.sha256",
                 "retrievalMode",
                 "完整渲染 Prompt 只传给模型网关");
         assertThat(read("docs/INTERVIEW_GUIDE.md")).contains(
                 "### Q20",
-                "哪版 Prompt 和哪版知识",
+                "哪版 Prompt、规则和知识",
                 "只追加审计日志");
         assertThat(read("docs/DEMO_DATA_GUIDE.md")).contains(
-                "Prompt 版本/指纹",
+                "完整规则集版本/指纹",
                 "向量/词法分");
         assertThat(read("scripts/demo.sh")).contains(
                 "来源快照验证通过",
                 "templateSha256",
+                "ruleSet",
                 "knowledgeVersion");
+    }
+
+    @Test
+    void documentsAndDemonstratesDecisionReplayAndStructuredDrift() throws IOException {
+        assertThat(read("README.md")).contains(
+                "决策重演与漂移分析",
+                "/{evaluationId}/replays",
+                "STABLE",
+                "SOURCE_DRIFT",
+                "DECISION_DRIFT",
+                "WEAKENED");
+        assertThat(read("docs/ARCHITECTURE.md")).contains(
+                "DecisionReplayService",
+                "DecisionDriftService",
+                "replayedFromEvaluationId",
+                "underwriting.decision.replays");
+        assertThat(read("docs/API_EXAMPLES.md")).contains(
+                "/{evaluationId}/replays",
+                "/{evaluationId}/drift",
+                "EVALUATION_NOT_REPLAY",
+                "Idempotency-Replayed: true");
+        assertThat(read("docs/INTERVIEW_GUIDE.md")).contains(
+                "### Q21",
+                "决策重演和普通重试有什么区别",
+                "不可变事实快照");
+        assertThat(read("docs/DEMO_DATA_GUIDE.md")).contains(
+                "决策重演阅读顺序",
+                "决策重演为什么不等于历史复现");
+        assertThat(read("scripts/demo.sh")).contains(
+                "[7/11] 决策重演与漂移分析",
+                "/replays",
+                "漂移等级 STABLE");
     }
 
     private String read(String path) throws IOException {

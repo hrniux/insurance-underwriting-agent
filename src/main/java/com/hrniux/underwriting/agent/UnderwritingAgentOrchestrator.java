@@ -139,7 +139,7 @@ public class UnderwritingAgentOrchestrator {
                 ruleEvaluation.decision(), ruleEvaluation.riskLevel(), ruleEvaluation.riskScore(),
                 modelResponse.summary(), modelResponse.reasons(), modelResponse.recommendedActions(),
                 facts.degradations(), evidence, ruleEvaluation.hits(), toolTraces, lastStepTraces(), modelResponse,
-                createdAt);
+                createdAt, rules.snapshot(), request.replayedFromEvaluationId());
 
         UnderwritingEvaluation saved = runStep(AgentStep.RESULT_PERSISTENCE, () -> {
             sessions.appendMessage(sessionId, SessionRole.ASSISTANT, modelResponse.summary());

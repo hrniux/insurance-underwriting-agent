@@ -8,6 +8,8 @@ import com.hrniux.underwriting.tool.HazardLevel;
 
 public final class DefaultUnderwritingRules {
 
+    public static final String RULE_SET_VERSION = "property-underwriting-default-v1";
+
     private static final BigDecimal HIGH_SUM_INSURED = new BigDecimal("10000000");
 
     private DefaultUnderwritingRules() {
@@ -20,6 +22,20 @@ public final class DefaultUnderwritingRules {
                 DefaultUnderwritingRules::repeatedClaims,
                 DefaultUnderwritingRules::highSumInsured,
                 DefaultUnderwritingRules::openRemediation);
+    }
+
+    public static RuleSetSnapshot snapshot(int baseScore) {
+        return RuleSetSnapshot.capture(RULE_SET_VERSION, baseScore, List.of(
+                "CRITICAL_FIRE_DEFECT|fireProtection=CRITICAL_DEFECT_OR_MISSING&fire=EXTREME"
+                        + "|severity=CRITICAL|score=50|decision=REJECT|priority=5",
+                "RED_RAINSTORM|rainstorm>=RED"
+                        + "|severity=HIGH|score=20|decision=MANUAL_REVIEW|priority=10",
+                "REPEATED_CLAIMS|claimCountThreeYears>=2"
+                        + "|severity=HIGH|score=15|decision=MANUAL_REVIEW|priority=20",
+                "HIGH_SUM_INSURED|sumInsured>=10000000"
+                        + "|severity=WARNING|score=10|decision=MANUAL_REVIEW|priority=30",
+                "OPEN_REMEDIATION|drainageRemediationCompleted=false"
+                        + "|severity=HIGH|score=15|decision=MANUAL_REVIEW|priority=40"));
     }
 
     private static Optional<RuleResult> criticalFireDefect(UnderwritingContext context) {

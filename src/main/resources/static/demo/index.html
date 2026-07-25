@@ -218,6 +218,18 @@
           </div>
           <a id="download-report" class="report-download">下载中文 Markdown 报告</a>
         </div>
+
+        <section id="decision-replay-panel" class="decision-replay-panel" aria-labelledby="decision-replay-heading" hidden>
+          <div class="decision-replay-action">
+            <div>
+              <strong id="decision-replay-heading">决策重演与漂移分析</strong>
+              <p>使用当前业务事实、知识、Prompt、规则集和模型重新运行，并与这次已保存评估逐项对比。</p>
+            </div>
+            <button id="run-decision-replay" class="secondary-button" type="button" disabled>重演当前决策</button>
+          </div>
+          <p id="decision-replay-status" aria-live="polite">尚未执行决策重演。</p>
+          <div id="decision-drift-result" hidden></div>
+        </section>
       </div>
     </section>
 
