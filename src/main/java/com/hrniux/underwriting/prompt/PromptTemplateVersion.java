@@ -4,6 +4,8 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.Set;
 
+import com.hrniux.underwriting.shared.validation.PathResourceIdentifier;
+
 public record PromptTemplateVersion(
         String code,
         int version,
@@ -13,7 +15,7 @@ public record PromptTemplateVersion(
         Instant createdAt) {
 
     public PromptTemplateVersion {
-        code = requireText(code, "code");
+        code = PathResourceIdentifier.require(code, "code");
         if (version <= 0) {
             throw new IllegalArgumentException("version must be positive");
         }

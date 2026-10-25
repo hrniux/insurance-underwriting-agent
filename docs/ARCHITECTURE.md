@@ -337,3 +337,23 @@ Spring Profile 选择：
 | `VectorStore` | 不可变内存快照、按文档原子替换 | PGVector / Milvus / OpenSearch 索引别名切换 |
 | `UnderwritingFactTools` | JSON 场景仓库 | 内部 REST/gRPC/MQ 适配器 |
 | `ModelGateway` | Mock / OpenAI-compatible | 企业模型平台 SDK |
+
+
+## 服务端复核案件查询
+
+`ReviewWorklistService` 只读组合 `EvaluationRepository.findAll()` 和 `HumanReviewRepository.findAll()`，
+按 evaluationId 进行一次关联，不逐行读取复核，也不调用 Agent、模型或场景仓库。状态由复核记录派生：无记录为
+`UNREVIEWED`，`MORE_INFORMATION_REQUIRED` 为 `INFORMATION_REQUESTED`，其余人工结论为 `REVIEWED`。
+先进行状态、Agent 决策与保单精确筛选，再按 riskScore 降序、createdAt 升序、id 升序稳定排序和分页。
+偏移使用 long 计算，超大页数仍安全返回空页。查询对默认内存与 persistent-demo 使用同一实现，无新增表或聚合字段。
+本地演示使用内存中的线性关联；生产规模应实现数据库侧投影、筛选和分页，避免加载全部历史正文。
+
+演示台从此接口取得紧凑列表，打开时读取原评估和人工复核，复用原详情、报告和重演界面，不依赖 sessionStorage。
+筛选/分页请求取消旧查询并检查响应所属请求，加载失败清理旧列表。打开案件同样取消旧读取，避免用户切换场景后
+慢响应覆盖当前案件。已保存评估不必仍存在于当前演示目录中；缺少当前场景资料时仍可查看原评估并提交人工复核。
+所有写入仍通过原评估或人工复核接口，`INFORMATION_REQUESTED` 不引入可编辑复核或新的工作流状态表。
+
+管理接口使用 `UriComponentsBuilder` 的严格模板变量编码来创建 Knowledge/Prompt 版本 Location，
+动态标识不会改变 URI 的查询或片段结构。`PathResourceIdentifier` 在领域对象/Prompt 服务写入前统一规范化
+和检查可寻址性，防止保存成功后才因 URI 构建失败返回400。它保留中文、空格和保留标点，只拒绝路径分隔符、
+点段与内部控制字符。Prompt 版本详情 GET 复用现有版本仓储，使201响应指向实际可查询资源。

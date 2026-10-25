@@ -2,6 +2,7 @@
 
 const SCENARIO_API = "/api/v1/demo/scenarios";
 const EVALUATION_API = "/api/v1/underwriting/evaluations";
+const WORKLIST_API = "/api/v1/underwriting/review-worklist";
 const HEALTH_API = "/actuator/health";
 const HISTORY_KEY = "underwriting-demo-history-v1";
 const THEME_KEY = "underwriting-demo-theme";
@@ -18,6 +19,9 @@ const state = {
   reviewController: null,
   replayController: null,
   comparisonController: null,
+  worklistController: null,
+  savedEvaluationController: null,
+  worklistPage: null,
   comparisonResults: [],
   scenarioFilter: "ALL",
   evaluationStartedAt: 0,
@@ -101,6 +105,11 @@ const LABELS = {
     GET_SURVEY_REPORT: "风险查勘工具",
     GET_DISASTER_RISK: "灾害风险工具",
     VALIDATE_RULES: "规则校验工具"
+  },
+  worklistStatuses: {
+    UNREVIEWED: "尚未复核",
+    INFORMATION_REQUESTED: "已要求补充资料",
+    REVIEWED: "已完成复核"
   },
   reviewOutcomes: {
     APPROVED: "同意承保",
@@ -292,9 +301,142 @@ async function requestJson(url, options = {}) {
   if (!response.ok) {
     const message = payload?.detail || payload?.title || `请求失败（HTTP ${response.status}）`;
     const trace = payload?.traceId ? `，追踪编号：${payload.traceId}` : "";
-    throw new Error(`${message}${trace}`);
+    const error = new Error(`${message}${trace}`);
+    error.status = response.status;
+    error.code = payload?.errorCode;
+    throw error;
   }
   return payload;
+}
+
+function renderWorklistItem(item) {
+  const row = el("li", "worklist-item");
+  row.dataset.evaluationId = item.id;
+  const details = el("div", "worklist-item__details");
+  details.append(
+    el("strong", null, `${text(item.policyNo)} · ${label("decisions", item.decision)} · ${item.riskScore}/100`),
+    el("span", null, `${label("worklistStatuses", item.status)} · ${new Date(item.createdAt).toLocaleString("zh-CN")}`),
+    el("small", "worklist-item__id", item.id)
+  );
+  if (item.reviewOutcome) {
+    details.append(el("span", null, `${label("reviewOutcomes", item.reviewOutcome)} · ${text(item.reviewerId)}`));
+  }
+  const button = el("button", "text-button", "打开案件");
+  button.type = "button";
+  button.setAttribute("aria-label", `打开评估 ${item.id}`);
+  button.addEventListener("click", () => openSavedEvaluation(item.id));
+  row.append(details, button);
+  return row;
+}
+
+async function loadReviewWorklist(page = 0) {
+  state.worklistController?.abort();
+  const controller = new AbortController();
+  state.worklistController = controller;
+  state.worklistPage = null;
+  const params = new URLSearchParams({ page: String(page), size: "10" });
+  for (const [parameter, selector] of [
+    ["status", "#worklist-status-filter"],
+    ["decision", "#worklist-decision-filter"],
+    ["policyNo", "#worklist-policy-filter"]
+  ]) {
+    const value = find(selector).value.trim();
+    if (value) params.set(parameter, value);
+  }
+  find("#worklist-list").replaceChildren();
+  find("#worklist-list").setAttribute("aria-busy", "true");
+  find("#worklist-status").textContent = "正在读取服务端案件……";
+  find("#worklist-page").textContent = "正在读取……";
+  find("#worklist-previous").disabled = true;
+  find("#worklist-next").disabled = true;
+  try {
+    const result = await requestJson(`${WORKLIST_API}?${params}`, { signal: controller.signal });
+    if (state.worklistController !== controller) return;
+    if (page > 0 && result.items.length === 0 && result.totalElements > 0) {
+      loadReviewWorklist(Math.max(0, result.totalPages - 1));
+      return;
+    }
+    state.worklistPage = result;
+    setChildren(find("#worklist-list"), result.items.map(renderWorklistItem));
+    find("#worklist-status").textContent = result.totalElements
+      ? "已读取服务端保存的评估。选择案件查看详情或记录人工复核。"
+      : "没有符合筛选条件的已保存评估。可先运行一组场景，或调整筛选条件。";
+    find("#worklist-page").textContent = result.totalPages
+      ? `共 ${result.totalElements} 条 · 第 ${result.page + 1} / ${result.totalPages} 页`
+      : "共 0 条";
+    find("#worklist-previous").disabled = result.page <= 0;
+    find("#worklist-next").disabled = result.page + 1 >= result.totalPages;
+  } catch (error) {
+    if (state.worklistController === controller && error.name !== "AbortError") {
+      find("#worklist-status").textContent = `案件列表读取失败：${text(error.message)} 请点击查询 / 刷新重试。`;
+      find("#worklist-page").textContent = "读取失败";
+    }
+  } finally {
+    if (state.worklistController === controller) {
+      state.worklistController = null;
+      find("#worklist-list").setAttribute("aria-busy", "false");
+    }
+  }
+}
+
+async function openSavedEvaluation(evaluationId) {
+  state.savedEvaluationController?.abort();
+  state.detailController?.abort();
+  state.detailController = null;
+  state.evaluationController?.abort();
+  state.evaluationController = null;
+  resetEvaluation();
+  state.detail = null;
+  find("#scenario-detail").hidden = true;
+  setDetailLoading(false);
+  const controller = new AbortController();
+  state.savedEvaluationController = controller;
+  find("#worklist-open-status").textContent = `正在读取评估 ${evaluationId}……`;
+  find("#evaluation-status").textContent = "正在读取服务端已保存评估……";
+  const url = `${EVALUATION_API}/${encodeURIComponent(evaluationId)}`;
+  try {
+    const [evaluation, review] = await Promise.all([
+      requestJson(url, { signal: controller.signal }),
+      requestJson(`${url}/review`, { signal: controller.signal }).catch(error => {
+        if (error.status === 404 && error.code === "HUMAN_REVIEW_NOT_FOUND") return null;
+        throw error;
+      })
+    ]);
+    if (state.savedEvaluationController !== controller) return;
+    let detail = null;
+    if (state.scenarios.some(scenario => scenario.policyNo === evaluation.policyNo)) {
+      try {
+        detail = await requestJson(`${SCENARIO_API}/${encodeURIComponent(evaluation.policyNo)}`, {
+          signal: controller.signal
+        });
+      } catch (error) {
+        if (error.name === "AbortError") throw error;
+      }
+    }
+    if (state.savedEvaluationController !== controller) return;
+    state.selectedPolicyNo = evaluation.policyNo;
+    state.detail = detail;
+    renderScenarioButtons();
+    if (detail) renderScenarioDetail(detail);
+    find("#detail-status").hidden = false;
+    find("#detail-status").textContent = detail
+      ? "上方为当前演示场景事实；下方读取已保存的原始评估。"
+      : "当前演示目录无可用场景事实；下方仍可查看并复核已保存的评估。";
+    state.evaluation = evaluation;
+    state.lastDurationMs = (evaluation.stepTraces || []).reduce((total, step) => total + (step.durationMs || 0), 0);
+    renderEvaluation(evaluation, detail?.expectedResult, state.lastDurationMs, { record: false, review });
+    activateResultTab("review", true);
+    find("#evaluation-status").textContent = `已读取服务端评估：${evaluation.id}`;
+    find("#worklist-open-status").textContent = `已打开评估 ${evaluation.id}，未重新执行 Agent。`;
+  } catch (error) {
+    if (state.savedEvaluationController === controller && error.name !== "AbortError") {
+      find("#worklist-open-status").textContent = `案件读取失败：${text(error.message)}`;
+      find("#evaluation-status").textContent = "已保存评估读取失败，请重试。";
+      showError(error.message);
+    }
+  } finally {
+    if (state.savedEvaluationController === controller) state.savedEvaluationController = null;
+  }
 }
 
 function createScenarioButton(scenario) {
@@ -406,7 +548,9 @@ function renderDecisionSummary(evaluation, expected) {
       : safetyOverride
         ? "comparison comparison--safety"
         : "comparison comparison--different",
-    matches
+    !expected
+      ? "已保存的服务端评估；当前目录无场景预期可供对照"
+      : matches
       ? "实际结论与场景预期一致"
       : safetyOverride
         ? `安全降级已覆盖常规场景预期（常规预期：${text(expected?.decisionLabel, label("decisions", expected?.decision))}）`
@@ -423,6 +567,7 @@ function renderDecisionSummary(evaluation, expected) {
   fill.style.width = `${score}%`;
   bar.append(fill);
 
+  if (!expected) comparison.className = "comparison";
   wrapper.append(
     heading,
     comparison,
@@ -838,6 +983,8 @@ function updateHistoryReview(review) {
 }
 
 async function restoreHistory(evaluationId) {
+  state.savedEvaluationController?.abort();
+  state.savedEvaluationController = null;
   const item = state.history.find(entry => entry.id === evaluationId);
   if (!item) return;
   if (state.selectedPolicyNo !== item.policyNo || !state.detail) {
@@ -991,6 +1138,7 @@ async function submitHumanReview(event) {
     if (state.reviewController !== controller || state.evaluation?.id !== evaluationId) return;
     state.review = review;
     renderHumanReview(review);
+    loadReviewWorklist(state.worklistPage?.page || 0);
   } catch (error) {
     if (error.name !== "AbortError") {
       find("#review-status").textContent = `复核提交失败：${text(error.message)}`;
@@ -1032,7 +1180,10 @@ function renderEvaluation(evaluation, expected, durationMs = 0, options = {}) {
   activateResultTab("overview");
   find("#result-content").hidden = false;
   find("#evaluation-status").textContent = `核保完成，评估编号：${text(evaluation.id)}`;
-  if (record) recordHistory(evaluation, durationMs);
+  if (record) {
+    recordHistory(evaluation, durationMs);
+    loadReviewWorklist(state.worklistPage?.page || 0);
+  }
   find("#result-content").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
@@ -1287,6 +1438,9 @@ function resetEvaluation() {
 
 async function selectScenario(policyNo) {
   if (!policyNo) return;
+  state.savedEvaluationController?.abort();
+  state.savedEvaluationController = null;
+  find("#worklist-open-status").textContent = "";
 
   state.detailController?.abort();
   state.evaluationController?.abort();
@@ -1322,6 +1476,8 @@ async function selectScenario(policyNo) {
 
 async function runEvaluation() {
   if (!state.detail || state.evaluationController) return;
+  state.savedEvaluationController?.abort();
+  state.savedEvaluationController = null;
 
   const detail = state.detail;
   const question = find("#question-input").value.trim();
@@ -1399,6 +1555,7 @@ async function runComparison() {
     }
 
     renderComparisonSummary(state.comparisonResults);
+    loadReviewWorklist(state.worklistPage?.page || 0);
     setChildren(find("#comparison-grid"), state.comparisonResults.map(renderComparisonCard));
     const failed = state.comparisonResults.filter(item => item.error).length;
     find("#comparison-status").textContent = failed
@@ -1421,6 +1578,7 @@ async function initialize() {
   state.history = historyFromStorage();
   renderHistory();
   checkServiceHealth();
+  loadReviewWorklist();
   try {
     const scenarios = await requestJson(SCENARIO_API);
     if (!Array.isArray(scenarios) || scenarios.length === 0) {
@@ -1428,7 +1586,9 @@ async function initialize() {
     }
     state.scenarios = scenarios;
     renderScenarioButtons();
-    await selectScenario(state.scenarios[0].policyNo);
+    if (!state.savedEvaluationController && !state.evaluation && !state.selectedPolicyNo) {
+      await selectScenario(state.scenarios[0].policyNo);
+    }
     find("#run-comparison").disabled = false;
     find("#comparison-status").textContent = `可对比 ${state.scenarios.length} 组虚构场景。`;
   } catch (error) {
@@ -1453,6 +1613,15 @@ function handleGlobalShortcut(event) {
 }
 
 applyTheme(preferredTheme());
+find("#worklist-filters").addEventListener("submit", event => {
+  event.preventDefault();
+  loadReviewWorklist();
+});
+for (const selector of ["#worklist-status-filter", "#worklist-decision-filter"]) {
+  find(selector).addEventListener("change", () => loadReviewWorklist());
+}
+find("#worklist-previous").addEventListener("click", () => loadReviewWorklist((state.worklistPage?.page || 0) - 1));
+find("#worklist-next").addEventListener("click", () => loadReviewWorklist((state.worklistPage?.page || 0) + 1));
 find("#run-evaluation").addEventListener("click", runEvaluation);
 find("#run-comparison").addEventListener("click", runComparison);
 find("#run-decision-replay").addEventListener("click", runDecisionReplay);

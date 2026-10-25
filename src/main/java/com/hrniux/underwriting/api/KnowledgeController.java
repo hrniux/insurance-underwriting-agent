@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import com.hrniux.underwriting.api.ApiDtos.KnowledgeDocumentRequest;
 import com.hrniux.underwriting.api.ApiDtos.KnowledgeEvaluationRequest;
@@ -41,9 +42,15 @@ public class KnowledgeController {
     public ResponseEntity<KnowledgeDocumentVersion> createDraft(
             @Valid @RequestBody KnowledgeDocumentRequest request) {
         KnowledgeDocumentVersion draft = knowledge.createDraft(request.toDomain());
-        String location = "/api/v1/knowledge/documents/%s/versions/%d"
-                .formatted(draft.documentId(), draft.version());
-        return ResponseEntity.created(URI.create(location)).body(draft);
+        return ResponseEntity.created(versionLocation(draft)).body(draft);
+    }
+
+    private URI versionLocation(KnowledgeDocumentVersion version) {
+        return UriComponentsBuilder.fromPath("/api/v1/knowledge/documents")
+                .pathSegment("{documentId}", "versions", "{version}")
+                .encode()
+                .buildAndExpand(version.documentId(), version.version())
+                .toUri();
     }
 
     @GetMapping("/documents")
@@ -73,9 +80,7 @@ public class KnowledgeController {
             @PathVariable String documentId,
             @Valid @RequestBody KnowledgeVersionRequest request) {
         KnowledgeDocumentVersion draft = knowledge.createVersion(documentId, request.toDomain(documentId));
-        String location = "/api/v1/knowledge/documents/%s/versions/%d"
-                .formatted(draft.documentId(), draft.version());
-        return ResponseEntity.created(URI.create(location)).body(draft);
+        return ResponseEntity.created(versionLocation(draft)).body(draft);
     }
 
     @PostMapping("/documents/{documentId}/versions/{version}/publish")

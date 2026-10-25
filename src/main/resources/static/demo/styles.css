@@ -179,7 +179,8 @@ h4 {
 .scenario-panel,
 .detail-panel,
 .result-panel,
-.comparison-panel {
+.comparison-panel,
+.worklist-panel {
   min-width: 0;
   padding: clamp(1.15rem, 2.5vw, 2rem);
   background: rgba(255, 253, 248, 0.98);
@@ -193,7 +194,8 @@ h4 {
 }
 
 .result-panel,
-.comparison-panel {
+.comparison-panel,
+.worklist-panel {
   grid-column: 1 / -1;
 }
 
@@ -1838,7 +1840,8 @@ kbd {
 :root[data-theme="dark"] .scenario-panel,
 :root[data-theme="dark"] .detail-panel,
 :root[data-theme="dark"] .result-panel,
-:root[data-theme="dark"] .comparison-panel {
+:root[data-theme="dark"] .comparison-panel,
+:root[data-theme="dark"] .worklist-panel {
   background: rgba(14, 41, 50, 0.96);
 }
 
@@ -1984,5 +1987,106 @@ kbd {
 @media (prefers-reduced-motion: reduce) {
   .live-pipeline__step[data-status="ACTIVE"]::before {
     animation: none;
+  }
+}
+
+
+.worklist-help,
+#worklist-status,
+#worklist-page,
+#worklist-open-status {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.worklist-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.8rem;
+  margin: 1rem 0;
+}
+
+.worklist-filters label {
+  display: grid;
+  flex: 1 1 12rem;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+  font-weight: 650;
+}
+
+.worklist-filters input,
+.worklist-filters select,
+.worklist-filters button {
+  min-height: 2.8rem;
+  width: 100%;
+  padding: 0.55rem 0.75rem;
+  color: var(--ink);
+  background: var(--surface-soft);
+  border: 1px solid var(--line-strong);
+  border-radius: 0.55rem;
+  font: inherit;
+}
+
+.worklist-filters button {
+  width: auto;
+  color: #fff;
+  background: var(--teal);
+  cursor: pointer;
+}
+
+.worklist-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.worklist-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  min-width: 0;
+  padding: 0.9rem;
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  border-radius: 0.65rem;
+}
+
+.worklist-item__details {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+  font-size: 0.85rem;
+}
+
+.worklist-item__id {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.worklist-item button {
+  flex-shrink: 0;
+}
+
+.worklist-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+#worklist-open-status:empty {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .worklist-list {
+    grid-template-columns: 1fr;
   }
 }

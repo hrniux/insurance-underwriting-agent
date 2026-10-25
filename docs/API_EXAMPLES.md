@@ -573,3 +573,33 @@ curl -sS "$BASE_URL/api/v1/sessions/SES-MISSING" \
   "timestamp": "2026-07-13T00:00:00Z"
 }
 ```
+
+
+## 服务端复核案件查询
+
+```bash
+curl --fail 'http://localhost:8080/api/v1/underwriting/review-worklist?status=UNREVIEWED&decision=MANUAL_REVIEW&policyNo=P-1001&page=0&size=10'
+```
+
+`status`、`decision`、`policyNo` 均可省略，省略时不筛选该字段。状态为 `UNREVIEWED`（无人工记录）、
+`INFORMATION_REQUESTED`（人工要求补充资料）、`REVIEWED`（人工承保或拒保）。保单号 trim 后忽略大小写精确匹配，
+最长 64 字符。`page` 默认 0，必须非负；`size` 默认 10，允许 1–50。非法参数返回 `400 VALIDATION_FAILED`。
+
+响应包含 `items`、`page`、`size`、`totalElements`、`totalPages`。每项提供 `id`、`policyNo`、`decision`、
+`riskLevel`、`riskScore`、`createdAt`、`status`、`reviewOutcome`、`reviewerId`、`reviewedAt` 和
+`replayedFromEvaluationId`；没有人工复核的可空字段为 null。列表不携带完整证据或审计正文。
+服务端先筛选，再按风险分降序、创建时间升序、编号升序分页。空结果和超出范围的页返回空 `items`，不会写入任何数据。
+
+打开列表中的评估，继续使用 `GET /api/v1/underwriting/evaluations/{id}` 与
+`GET /api/v1/underwriting/evaluations/{id}/review`；后者在没有人工记录时返回 `404 HUMAN_REVIEW_NOT_FOUND`。
+记录复核使用已有 `POST .../{id}/review`，不会覆盖 Agent 原始建议或已有人工结论。
+
+## 管理资源标识与 Location
+
+知识文档 `id` 和 Prompt `code` 会 trim；中文、内部空格、`?`、`#`、`%` 和 `;` 可作为标识内容。
+创建响应中的 `Location` 已按单个路径段编码，可直接 GET，无需再次编码。自行拼接集合、发布或激活 URL 时，
+调用方应对动态标识段进行百分号编码，避免把 `?` 当查询、`#` 当片段或 `;` 当矩阵参数。
+`/`、`\`、独立的 `.`/`..` 与内部控制字符不能作为这些可寻址标识；非法输入在写入前返回 `400 VALIDATION_FAILED`。
+
+`GET /api/v1/prompts/{code}/versions/{version}` 返回指定版本（与创建响应的 Location 对应）；
+版本不存在返回 `404 PROMPT_VERSION_NOT_FOUND`。原 `GET /api/v1/prompts/{code}` 继续返回完整版本集合。

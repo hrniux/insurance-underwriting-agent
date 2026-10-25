@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 
 import com.hrniux.underwriting.shared.error.PromptRenderException;
 import com.hrniux.underwriting.shared.error.ResourceNotFoundException;
+import com.hrniux.underwriting.shared.validation.PathResourceIdentifier;
 
 @Service
 public class PromptTemplateService {
@@ -82,6 +83,13 @@ public class PromptTemplateService {
                 .orElseThrow(() -> new ResourceNotFoundException("PROMPT_NOT_FOUND", normalizedCode));
     }
 
+    public PromptTemplateVersion getVersion(String code, int version) {
+        String normalizedCode = normalizeCode(code);
+        return repository.findByCodeAndVersion(normalizedCode, version)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "PROMPT_VERSION_NOT_FOUND", normalizedCode + ":" + version));
+    }
+
     public List<PromptTemplateVersion> versions(String code) {
         return List.copyOf(repository.findByCode(normalizeCode(code)));
     }
@@ -116,10 +124,7 @@ public class PromptTemplateService {
     }
 
     private String normalizeCode(String code) {
-        if (code == null || code.isBlank()) {
-            throw new IllegalArgumentException("code must not be blank");
-        }
-        return code.trim();
+        return PathResourceIdentifier.require(code, "code");
     }
 
     private String sha256(String value) {

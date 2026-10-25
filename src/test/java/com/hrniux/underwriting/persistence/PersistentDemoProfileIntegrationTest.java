@@ -253,6 +253,16 @@ class PersistentDemoProfileIntegrationTest {
         assertThat(reviews.findByEvaluationId(evaluationId)).isPresent().get()
                 .extracting(review -> review.reviewerId()).isEqualTo("UW-PERSISTENCE-TEST");
 
+        mvc.perform(get("/api/v1/underwriting/review-worklist").param("policyNo", "P-1001"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(2))
+                .andExpect(jsonPath("$.items[0].id").value(evaluationId))
+                .andExpect(jsonPath("$.items[0].status").value("REVIEWED"))
+                .andExpect(jsonPath("$.items[0].reviewerId").value("UW-PERSISTENCE-TEST"))
+                .andExpect(jsonPath("$.items[1].id").value(replayId))
+                .andExpect(jsonPath("$.items[1].status").value("UNREVIEWED"))
+                .andExpect(jsonPath("$.items[1].replayedFromEvaluationId").value(evaluationId));
+
         mvc.perform(get("/api/v1/sessions/{id}", sessionId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.messages.length()").value(2));
