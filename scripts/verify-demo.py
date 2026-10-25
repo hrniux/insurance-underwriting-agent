@@ -1,19 +1,23 @@
 #!/usr/bin/env python3
 """Verify the offline Mock HTTP contract using only the Python standard library."""
 import argparse
+from contextlib import contextmanager
 from datetime import datetime, timezone
 import json
 import math
 from pathlib import Path
 import re
+import signal
 import subprocess
 import sys
+import time
 from urllib.error import HTTPError
 from urllib.parse import urlsplit, quote
 from urllib.request import Request, build_opener, ProxyHandler
 import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
+REQUEST_TIMEOUT_SECONDS = 15
 EXPECTED = {'P-1001': ('MANUAL_REVIEW', 'HIGH', 70), 'P-2001': ('APPROVE', 'LOW', 10),
             'P-3001': ('MANUAL_REVIEW', 'MEDIUM', 40), 'P-4001': ('REJECT', 'HIGH', 60)}
 STEPS = ['QUESTION_UNDERSTANDING', 'BUSINESS_DATA_COLLECTION', 'KNOWLEDGE_RETRIEVAL',
@@ -69,6 +73,36 @@ def run_id():
     return datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ') + '-' + uuid.uuid4().hex[:10]
 
 
+@contextmanager
+def wall_clock_deadline(seconds):
+    """Interrupt the entire operation, including continuously active socket reads (Unix main thread)."""
+    def expired(signum, frame):
+        raise TimeoutError(f'wall-clock deadline exceeded ({seconds} seconds)')
+
+    previous_handler = signal.getsignal(signal.SIGALRM)
+    previous_timer = signal.getitimer(signal.ITIMER_REAL)
+    started = time.monotonic()
+    signal.signal(signal.SIGALRM, expired)
+    signal.setitimer(signal.ITIMER_REAL, min(seconds, previous_timer[0]) if previous_timer[0] else seconds)
+    try:
+        yield
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, previous_handler)
+        if previous_timer[0]:
+            remaining = max(0.000001, previous_timer[0] - (time.monotonic() - started))
+            signal.setitimer(signal.ITIMER_REAL, remaining, previous_timer[1])
+
+
+def probe_ready(base_url, log_path, timeout=1):
+    """Check owned-process startup and health within one complete wall-clock deadline."""
+    with wall_clock_deadline(timeout):
+        require('Started UnderwritingAgentApplication' in Path(log_path).read_text(errors='replace'),
+                'owned application has not started')
+        with build_opener(ProxyHandler({})).open(base_url + '/actuator/health', timeout=timeout) as response:
+            require(json.load(response)['status'] == 'UP', 'service unhealthy')
+
+
 class Client:
     def __init__(self, base_url, output):
         self.base_url, self.output = base_url, output
@@ -85,18 +119,28 @@ class Client:
             headers['Idempotency-Key'] = key
         request = Request(self.base_url + path, data=data, headers=headers,
                           method=method or ('POST' if data is not None else 'GET'))
+        response = None
         try:
-            response = self.opener.open(request, timeout=15)
-        except HTTPError as error:
-            response = error
-        with response:
-            body = response.read()
-            status = response.status
-            saved_headers = {field: response.headers.get(field) for field in
-                             ('Content-Type', 'Idempotency-Replayed', 'Location')}
-        (self.output / (name + '.body')).write_bytes(body)
-        (self.output / (name + '.http.json')).write_text(json.dumps(
-            {'status': status, 'headers': saved_headers}, ensure_ascii=False, indent=2), encoding='utf-8')
+            with wall_clock_deadline(REQUEST_TIMEOUT_SECONDS):
+                try:
+                    response = self.opener.open(request, timeout=REQUEST_TIMEOUT_SECONDS)
+                except HTTPError as error:
+                    response = error
+                # Stream received bytes to disk so a deadline also preserves partial response evidence.
+                with response, (self.output / (name + '.body')).open('wb') as raw:
+                    while True:
+                        chunk = response.read1(65536)
+                        if not chunk:
+                            break
+                        raw.write(chunk)
+        finally:
+            if response is not None:
+                status = response.status
+                saved_headers = {field: response.headers.get(field) for field in
+                                 ('Content-Type', 'Idempotency-Replayed', 'Location')}
+                (self.output / (name + '.http.json')).write_text(json.dumps(
+                    {'status': status, 'headers': saved_headers}, ensure_ascii=False, indent=2), encoding='utf-8')
+        body = (self.output / (name + '.body')).read_bytes()
         require(status == expected, f'{name}: expected HTTP {expected}, got {status}')
         if markdown:
             require('text/markdown' in (saved_headers['Content-Type'] or ''), 'report content type mismatch')

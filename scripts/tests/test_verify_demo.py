@@ -1,6 +1,6 @@
 """Acceptance-validator regression tests; fixtures follow the Java response DTOs."""
 import copy
-from contextlib import redirect_stderr, redirect_stdout
+from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from io import StringIO
 import importlib.util
 import json
@@ -8,6 +8,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 import tempfile
 import threading
+import time
 import unittest
 
 SCRIPT = Path(__file__).resolve().parents[1] / 'verify-demo.py'
@@ -39,6 +40,45 @@ def evaluation(policy='P-1001', decision='MANUAL_REVIEW', risk='HIGH', score=70)
                                      'templateSha256': 'a' * 64}},
         'ruleSet': {'version': 'property-underwriting-default-v1', 'ruleCount': 5, 'sha256': 'b' * 64},
     }
+
+
+@contextmanager
+def dripping_health_server(stage='body', interval=0.03):
+    """Send legitimate health JSON with gaps shorter than the configured socket timeout."""
+    stopped = threading.Event()
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            body = b'{"status":"UP"}'
+            try:
+                if stage == 'headers':
+                    self.wfile.write(b'HTTP/1.0 200 OK\r\nContent-Type: application/json\r\nX-Slow: ')
+                    fragments = b'x' * 20
+                else:
+                    self.send_response(200)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    fragments = body
+                for byte in fragments:
+                    self.wfile.write(bytes([byte]))
+                    self.wfile.flush()
+                    if stopped.wait(interval):
+                        return
+                if stage == 'headers':
+                    self.wfile.write(b'\r\n\r\n' + body)
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+        def log_message(self, *args):
+            pass
+    server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+    thread = threading.Thread(target=lambda: server.serve_forever(poll_interval=0.02), daemon=True)
+    thread.start()
+    try:
+        yield f'http://127.0.0.1:{server.server_port}'
+    finally:
+        stopped.set()
+        server.shutdown()
+        server.server_close()
+        thread.join()
 
 
 class ValidatorTest(unittest.TestCase):
@@ -121,6 +161,38 @@ class ValidatorTest(unittest.TestCase):
             server.shutdown()
             server.server_close()
             thread.join()
+
+    def test_dripping_headers_and_body_have_request_deadline_and_failed_summary(self):
+        self.validator.REQUEST_TIMEOUT_SECONDS = 0.15
+        for stage in ['headers', 'body']:
+            with self.subTest(stage=stage), dripping_health_server(stage) as base_url:
+                with tempfile.TemporaryDirectory() as directory:
+                    started = time.monotonic()
+                    with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+                        code = self.validator.main(['--base-url', base_url, '--output-dir', directory])
+                    elapsed = time.monotonic() - started
+                    summary = json.loads((Path(directory) / 'summary.json').read_text())
+                    self.assertEqual(code, 1)
+                    self.assertIs(summary['passed'], False)
+                    self.assertIn('deadline', summary['error'])
+                    if stage == 'body':
+                        partial = (Path(directory) / 'health.body').read_bytes()
+                        self.assertTrue(partial)
+                        self.assertTrue(b'{"status":"UP"}'.startswith(partial))
+                        self.assertLess(len(partial), len(b'{"status":"UP"}'))
+                        self.assertEqual(json.loads((Path(directory) / 'health.http.json').read_text())['status'], 200)
+                    self.assertLess(elapsed, 0.5, 'dripping response escaped complete-request deadline')
+
+    def test_readiness_probe_cannot_wait_for_a_dripping_health_body(self):
+        self.assertTrue(callable(getattr(self.validator, 'probe_ready', None)),
+                        'readiness needs a complete-probe deadline')
+        with dripping_health_server() as base_url, tempfile.TemporaryDirectory() as directory:
+            log = Path(directory) / 'application.log'
+            log.write_text('Started UnderwritingAgentApplication')
+            started = time.monotonic()
+            with self.assertRaisesRegex(TimeoutError, 'deadline'):
+                self.validator.probe_ready(base_url, log, timeout=0.15)
+            self.assertLess(time.monotonic() - started, 0.5)
 
     def test_http_error_and_malformed_json_preserve_failed_summary_and_raw_body(self):
         for status, body in [(503, b'{"error":"unavailable"}'), (200, b'not-json')]:

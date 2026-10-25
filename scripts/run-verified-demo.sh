@@ -112,17 +112,10 @@ for ((attempt=0; attempt<60; attempt++)); do
     exit 1
   fi
   if python3 - "$BASE_URL" "$OUTPUT/application.log" <<'PY'
-import json
-from pathlib import Path
+import runpy
 import sys
-from urllib.request import build_opener, ProxyHandler
-# A health response alone could come from a racing unrelated service.
-if 'Started UnderwritingAgentApplication' not in Path(sys.argv[2]).read_text(errors='replace'):
-    raise SystemExit(1)
 try:
-    with build_opener(ProxyHandler({})).open(sys.argv[1] + '/actuator/health', timeout=1) as response:
-        if json.load(response)['status'] != 'UP':
-            raise SystemExit(1)
+    runpy.run_path('scripts/verify-demo.py')['probe_ready'](sys.argv[1], sys.argv[2])
 except Exception:
     raise SystemExit(1)
 PY
