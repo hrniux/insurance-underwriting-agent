@@ -6,3 +6,4 @@ target/
 *.log
 application-local.yml
 data/
+__pycache__/

@@ -25,7 +25,7 @@ if [[ "$dry_run" == true ]]; then
 fi
 
 command -v gh >/dev/null || { echo 'Install GitHub CLI and sign in on your computer first.' >&2; exit 1; }
-active_login="$(gh api user --jq .login)"
+active_login="$(gh api --hostname github.com user --jq .login)"
 if [[ "$active_login" != hrniux ]]; then
   echo "Expected GitHub account hrniux; active account is $active_login. No Stars changed." >&2
   exit 1
@@ -33,11 +33,11 @@ fi
 
 confirmed=0
 while IFS= read -r repository; do
-  if ! gh api --silent --method PUT "user/starred/$repository"; then
+  if ! gh api --hostname github.com --silent --method PUT "user/starred/$repository"; then
     echo "Star failed for $repository. Confirm Starring write permission. Confirmed so far: $confirmed/20." >&2
     exit 1
   fi
-  if ! gh api --silent "user/starred/$repository"; then
+  if ! gh api --hostname github.com --silent "user/starred/$repository"; then
     echo "Could not verify Star for $repository. Confirm Starring read permission. Confirmed so far: $confirmed/20." >&2
     exit 1
   fi
