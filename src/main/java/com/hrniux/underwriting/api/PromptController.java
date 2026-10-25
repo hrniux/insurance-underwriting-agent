@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import com.hrniux.underwriting.api.ApiDtos.PromptPreviewRequest;
 import com.hrniux.underwriting.api.ApiDtos.PromptPreviewResponse;
@@ -44,8 +45,17 @@ public class PromptController {
             @PathVariable String code,
             @Valid @RequestBody PromptVersionRequest request) {
         PromptTemplateVersion template = prompts.createVersion(code, request.body(), request.requiredVariables());
-        return ResponseEntity.created(URI.create("/api/v1/prompts/%s/versions/%d".formatted(code, template.version())))
-                .body(template);
+        URI location = UriComponentsBuilder.fromPath("/api/v1/prompts")
+                .pathSegment("{code}", "versions", "{version}")
+                .encode()
+                .buildAndExpand(template.code(), template.version())
+                .toUri();
+        return ResponseEntity.created(location).body(template);
+    }
+
+    @GetMapping("/{code}/versions/{version}")
+    public PromptTemplateVersion getVersion(@PathVariable String code, @PathVariable int version) {
+        return prompts.getVersion(code, version);
     }
 
     @PostMapping("/{code}/versions/{version}/activate")

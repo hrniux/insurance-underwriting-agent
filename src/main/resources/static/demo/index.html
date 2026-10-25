@@ -43,6 +43,47 @@
   </header>
 
   <main id="main-content" class="workspace">
+    <section id="review-worklist" class="worklist-panel" aria-labelledby="worklist-heading">
+      <div class="panel-heading">
+        <div>
+          <p class="section-kicker">REVIEW WORKLIST</p>
+          <h2 id="worklist-heading">服务端复核案件</h2>
+        </div>
+        <span class="step-pill">已保存评估</span>
+      </div>
+      <p class="worklist-help">从服务端发现历史案件，按风险分优先、同分先处理较早评估。打开案件不会重新运行 Agent；使用持久化模式时可在重启后继续读取。</p>
+      <form id="worklist-filters" class="worklist-filters">
+        <label>复核状态
+          <select id="worklist-status-filter" name="status">
+            <option value="UNREVIEWED">尚未复核</option>
+            <option value="INFORMATION_REQUESTED">已要求补充资料</option>
+            <option value="REVIEWED">已完成复核</option>
+            <option value="">全部状态</option>
+          </select>
+        </label>
+        <label>Agent 建议
+          <select id="worklist-decision-filter" name="decision">
+            <option value="MANUAL_REVIEW">人工复核</option>
+            <option value="APPROVE">自动通过</option>
+            <option value="REJECT">拒保</option>
+            <option value="">全部建议</option>
+          </select>
+        </label>
+        <label>保单号（精确匹配）
+          <input id="worklist-policy-filter" name="policyNo" type="search" maxlength="64" placeholder="如 P-1001" autocomplete="off">
+        </label>
+        <button id="worklist-refresh" type="submit">查询 / 刷新</button>
+      </form>
+      <p id="worklist-status" role="status" aria-live="polite">正在读取服务端案件……</p>
+      <ul id="worklist-list" class="worklist-list" aria-label="已保存核保案件" aria-busy="false"></ul>
+      <div class="worklist-pagination" aria-label="案件分页">
+        <button id="worklist-previous" class="text-button" type="button" disabled>上一页</button>
+        <span id="worklist-page">尚未读取</span>
+        <button id="worklist-next" class="text-button" type="button" disabled>下一页</button>
+      </div>
+      <p id="worklist-open-status" role="status" aria-live="polite"></p>
+    </section>
+
     <aside class="scenario-panel" aria-labelledby="scenario-heading">
       <div class="panel-heading">
         <div>

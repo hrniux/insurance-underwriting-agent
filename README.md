@@ -50,6 +50,7 @@ cd insurance-underwriting-agent
 - REST + MCP：REST 用于管理和调试，MCP 用于 Agent 工具发现与调用，两者复用同一业务实现。
 - 中文交互演示：无需复制命令即可选择四组虚构场景，运行真实核保并阅读规则、证据和七步轨迹。
 - 中文核保报告：把已保存的单次评估导出为 Markdown，完整保留结论、规则、证据、七步轨迹、工具记录和模型元数据。
+- 服务端复核案件：按复核状态、Agent 建议和保单精确筛选已保存评估，按风险优先稳定分页；换标签页或持久化重启后可直接打开原评估继续查看和复核，无需重新运行 Agent。
 - 人工复核闭环：核保人可确认、推翻或要求补充资料；复核记录原子创建、不可覆盖，并进入报告和反馈导出接口。
 - 可选重启恢复：`persistent-demo` Profile 把会话、评估和人工复核切换到 H2 文件库，进程重启后仍可查询；默认 Profile 继续使用内存仓储。
 - 运行指标：Actuator 暴露评估、降级、人工复核、异步任务和决策重演十组低基数 Micrometer 指标。
@@ -62,6 +63,16 @@ cd insurance-underwriting-agent
 ./mvnw clean verify
 ./mvnw spring-boot:run
 ```
+
+修改浏览器演示台后，可用 Node.js 22+ 运行无需额外依赖的行为回归测试；CI 同时执行 Maven 与这组检查：
+
+```bash
+node --test src/test/js/*.test.cjs
+```
+
+可选的真实浏览器回归需在测试环境安装 Playwright 并先启动本地应用：
+`node scripts/test-demo-history.cjs http://localhost:8080`。
+已有 Chromium 可通过 `CHROMIUM_EXECUTABLE_PATH` 指定，不影响应用启动依赖。
 
 新开终端检查服务：
 
@@ -163,6 +174,21 @@ curl --fail http://localhost:8080/actuator/metrics/underwriting.human.reviews
 同一评估第二次提交会返回 `409 HUMAN_REVIEW_ALREADY_EXISTS`，避免覆盖审计结论。重新下载该评估的
 Markdown 报告即可看到 Agent 辅助建议与人工最终处理的并列记录。
 
+### 服务端复核案件列表
+
+演示台的“服务端复核案件”从后端读取所有已保存评估，默认显示尚未复核且 Agent 建议人工复核的案件。
+可按复核状态、Agent 建议和保单号筛选；结果按风险分降序、创建时间升序、评估编号升序排列，每页 10 条。
+点击“打开案件”会读取原评估和已有人工复核，复用详情、报告与重演功能，不会重新执行 Agent。此列表独立于当前标签页的会话记录。
+
+```bash
+curl --fail 'http://localhost:8080/api/v1/underwriting/review-worklist?status=UNREVIEWED&decision=MANUAL_REVIEW&page=0&size=10'
+```
+
+`UNREVIEWED` 表示尚无人工记录，`INFORMATION_REQUESTED` 表示已要求补充资料，`REVIEWED` 表示人工已承保或拒保。
+“要求补充资料”也是不可覆盖的审计记录；资料变化后可用现有重演创建新评估，再记录新的人工处理。
+默认内存模式只发现本进程保存的记录；`persistent-demo` 模式可读取重启前的评估和复核。打开历史评估时，
+页面会明确区分当前演示场景事实与已保存的原评估。
+
 ### 可选文件数据库与重启恢复
 
 默认启动仍是最简单的内存模式，不需要数据库。需要在面试中演示“应用进程重启后评估和人工复核仍存在”时，
@@ -231,6 +257,8 @@ SPRING_PROFILES_ACTIVE=persistent-demo ./mvnw spring-boot:run
 顶部服务状态会调用 Actuator 健康检查并显示浏览器观察到的响应耗时。实时七步状态在请求进行期间明确标记为页面等待进度，服务端返回后会由真实 `stepTraces` 状态与耗时覆盖，避免把前端动画误解成后端流式事件。
 
 工作台不依赖外部字体、图标或前端框架，支持浅色/深色主题、键盘操作、移动端布局和减少动态效果偏好。主题写入浏览器本地存储；评估历史只写入当前标签页的会话存储，不上传额外数据。
+
+本次会话记录是本地快捷入口。恢复时会重新读取服务端原评估和当前人工复核，避免另一标签页已复核后仍显示过期表单；选择历史案件也会取消页面上正在等待的评估结果。默认内存模式重启后，已消失的服务端评估无法从本地历史恢复；页面会明确显示读取失败，并清除旧的复核表单和报告入口。需要跨重启恢复时请使用 `persistent-demo`。
 
 ## 十分钟学习路线
 

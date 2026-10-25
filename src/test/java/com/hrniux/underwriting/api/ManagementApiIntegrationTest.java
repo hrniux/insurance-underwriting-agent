@@ -3,6 +3,7 @@ package com.hrniux.underwriting.api;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.util.UUID;
@@ -188,6 +189,25 @@ class ManagementApiIntegrationTest {
                         .content("{\"variables\":{\"question\":\"是否承保\"}}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.rendered").value("问题：是否承保"));
+    }
+
+    @Test
+    void createsPaddedPromptCodesWithACanonicalLocationAndVersionHistory() throws Exception {
+        String code = "api-canonical-" + UUID.randomUUID();
+        String body = "{\"body\":\"问题：{{question}}\",\"requiredVariables\":[\"question\"]}";
+        mvc.perform(post("/api/v1/prompts/{code}/versions", code)
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isCreated());
+
+        mvc.perform(post("/api/v1/prompts/{code}/versions", " " + code + " ")
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isCreated())
+                .andExpect(header().string("Location", "/api/v1/prompts/" + code + "/versions/2"))
+                .andExpect(jsonPath("$.code").value(code))
+                .andExpect(jsonPath("$.version").value(2));
+        mvc.perform(get("/api/v1/prompts/{code}", code))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2));
     }
 
     @Test

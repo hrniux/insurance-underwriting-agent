@@ -3,6 +3,8 @@ package com.hrniux.underwriting.rag;
 import java.util.Map;
 import java.util.Objects;
 
+import com.hrniux.underwriting.shared.validation.PathResourceIdentifier;
+
 public record KnowledgeDocument(
         String id,
         String title,
@@ -12,7 +14,7 @@ public record KnowledgeDocument(
         Map<String, String> metadata) {
 
     public KnowledgeDocument {
-        id = requireText(id, "id");
+        id = PathResourceIdentifier.require(id, "id");
         title = requireText(title, "title");
         Objects.requireNonNull(type, "type must not be null");
         productCode = requireText(productCode, "productCode").toUpperCase(java.util.Locale.ROOT);

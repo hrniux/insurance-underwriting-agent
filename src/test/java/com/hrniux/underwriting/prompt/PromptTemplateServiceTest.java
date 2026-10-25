@@ -46,6 +46,25 @@ class PromptTemplateServiceTest {
     }
 
     @Test
+    void treatsPaddedPromptCodesAsOneVersionHistory() {
+        service.createVersion("analysis", "original {{question}}", Set.of("question"));
+        PromptTemplateVersion second = service.createVersion(
+                " analysis ", "replacement {{question}}", Set.of("question"));
+
+        assertThat(second.code()).isEqualTo("analysis");
+        assertThat(second.version()).isEqualTo(2);
+        assertThat(service.versions(" analysis "))
+                .extracting(PromptTemplateVersion::version)
+                .containsExactly(1, 2);
+        service.activate(" analysis ", 2);
+        assertThat(service.versions("analysis"))
+                .extracting(PromptTemplateVersion::active)
+                .containsExactly(false, true);
+        assertThat(service.preview(" analysis ", Map.of("question", "test")))
+                .isEqualTo("replacement test");
+    }
+
+    @Test
     void rendersTheActiveTemplateWithAllDeclaredVariables() {
         service.createVersion(
                 "underwriting-analysis",

@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 
 import com.hrniux.underwriting.shared.error.PromptRenderException;
 import com.hrniux.underwriting.shared.error.ResourceNotFoundException;
+import com.hrniux.underwriting.shared.validation.PathResourceIdentifier;
 
 @Service
 public class PromptTemplateService {
@@ -39,6 +40,7 @@ public class PromptTemplateService {
 
     public synchronized PromptTemplateVersion createVersion(
             String code, String body, Set<String> requiredVariables) {
+        String normalizedCode = normalizeCode(code);
         Set<String> declared = Set.copyOf(Objects.requireNonNull(
                 requiredVariables, "requiredVariables must not be null"));
         Set<String> placeholders = placeholders(body);
@@ -51,36 +53,45 @@ public class PromptTemplateService {
                     "Prompt variables do not match; undeclared=" + undeclared + ", unused=" + unused);
         }
 
-        List<PromptTemplateVersion> history = repository.findByCode(code);
+        List<PromptTemplateVersion> history = repository.findByCode(normalizedCode);
         int nextVersion = history.stream()
                 .mapToInt(PromptTemplateVersion::version)
                 .max()
                 .orElse(0) + 1;
         PromptTemplateVersion template = new PromptTemplateVersion(
-                code, nextVersion, body, declared, history.isEmpty(), clock.instant());
+                normalizedCode, nextVersion, body, declared, history.isEmpty(), clock.instant());
         return repository.save(template);
     }
 
     public synchronized PromptTemplateVersion activate(String code, int version) {
-        PromptTemplateVersion selected = repository.findByCodeAndVersion(code, version)
+        String normalizedCode = normalizeCode(code);
+        PromptTemplateVersion selected = repository.findByCodeAndVersion(normalizedCode, version)
                 .orElseThrow(() -> new ResourceNotFoundException(
-                        "PROMPT_VERSION_NOT_FOUND", code + ":" + version));
-        List<PromptTemplateVersion> updated = repository.findByCode(code).stream()
+                        "PROMPT_VERSION_NOT_FOUND", normalizedCode + ":" + version));
+        List<PromptTemplateVersion> updated = repository.findByCode(normalizedCode).stream()
                 .map(template -> template.withActive(template.version() == version))
                 .toList();
-        repository.replace(code, updated);
+        repository.replace(normalizedCode, updated);
         return selected.withActive(true);
     }
 
     public PromptTemplateVersion active(String code) {
-        return repository.findByCode(code).stream()
+        String normalizedCode = normalizeCode(code);
+        return repository.findByCode(normalizedCode).stream()
                 .filter(PromptTemplateVersion::active)
                 .findFirst()
-                .orElseThrow(() -> new ResourceNotFoundException("PROMPT_NOT_FOUND", code));
+                .orElseThrow(() -> new ResourceNotFoundException("PROMPT_NOT_FOUND", normalizedCode));
+    }
+
+    public PromptTemplateVersion getVersion(String code, int version) {
+        String normalizedCode = normalizeCode(code);
+        return repository.findByCodeAndVersion(normalizedCode, version)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "PROMPT_VERSION_NOT_FOUND", normalizedCode + ":" + version));
     }
 
     public List<PromptTemplateVersion> versions(String code) {
-        return List.copyOf(repository.findByCode(code));
+        return List.copyOf(repository.findByCode(normalizeCode(code)));
     }
 
     public List<PromptTemplateVersion> listAll() {
@@ -110,6 +121,10 @@ public class PromptTemplateService {
         return new RenderedPrompt(
                 new PromptSnapshot(template.code(), template.version(), sha256(template.body())),
                 rendered.toString());
+    }
+
+    private String normalizeCode(String code) {
+        return PathResourceIdentifier.require(code, "code");
     }
 
     private String sha256(String value) {
