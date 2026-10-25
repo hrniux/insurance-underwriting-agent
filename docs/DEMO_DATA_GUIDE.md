@@ -75,8 +75,8 @@
 在项目根目录执行：
 
 ```bash
-mvn clean verify
-mvn spring-boot:run
+./mvnw clean verify
+./mvnw spring-boot:run
 ```
 
 预期结果：测试通过，应用监听 `http://localhost:8080`。
@@ -294,7 +294,7 @@ bash scripts/knowledge-lifecycle-demo.sh
 - `StepStatus.DEGRADED`：资料采集虽然不完整，但在人工复核底线下允许继续；
 - `DegradationNotice`：记录告警编码、工具、错误码、处置说明和决策下限。
 
-可运行 `SPRING_PROFILES_ACTIVE=degraded-demo mvn spring-boot:run`，再执行 `P-2001`。正常场景的
+可运行 `SPRING_PROFILES_ACTIVE=degraded-demo ./mvnw spring-boot:run`，再执行 `P-2001`。正常场景的
 10 分低风险会保留，但原本的自动通过将提升为人工复核，页面和下载报告都会显示降级告警。
 
 ### 7.5 人工复核结果 `HumanReviewOutcome`
@@ -327,7 +327,7 @@ bash scripts/knowledge-lifecycle-demo.sh
 6. 执行：
 
 ```bash
-mvn -Dtest=DemoScenarioRepositoryTest,UnderwritingRuleEngineTest test
+./mvnw -Dtest=DemoScenarioRepositoryTest,UnderwritingRuleEngineTest test
 ```
 
 预期结果：数据加载和规则测试通过。如果保单号重复、金额为负数或日期错误，应用与测试会明确指出无效场景。

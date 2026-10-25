@@ -8,10 +8,10 @@ export BASE_URL=http://localhost:8080
 
 ## 可选持久化启动与重启读取
 
-普通 `mvn spring-boot:run` 使用内存仓储。需要让会话、评估和人工复核跨进程重启保留时：
+普通 `./mvnw spring-boot:run` 使用内存仓储。需要让会话、评估和人工复核跨进程重启保留时：
 
 ```bash
-SPRING_PROFILES_ACTIVE=persistent-demo mvn spring-boot:run
+SPRING_PROFILES_ACTIVE=persistent-demo ./mvnw spring-boot:run
 ```
 
 应用会在 `data/underwriting.mv.db` 创建 H2 文件。先按后文示例创建评估和人工复核，保存返回的
@@ -251,7 +251,7 @@ curl -sS "$BASE_URL/actuator/metrics/underwriting.task.duration" | python3 -m js
 先停止普通进程，然后使用专用 Profile 启动：
 
 ```bash
-SPRING_PROFILES_ACTIVE=degraded-demo mvn spring-boot:run
+SPRING_PROFILES_ACTIVE=degraded-demo ./mvnw spring-boot:run
 ```
 
 提交 `P-2001`：

@@ -4,6 +4,24 @@
 
 默认配置完全离线，使用虚构数据、Hash Embedding、内存向量库和确定性 Mock 模型，**无需 API Key**、数据库或外部模型即可启动。所有公司名、地址、条款和保单均为虚构示例，不包含真实业务数据。
 
+## 先跑一次
+
+准备完整 JDK 21 和 Git。仓库自带 Maven Wrapper，无需全局安装 Maven；首次运行需要联网下载 Maven 和依赖。
+
+```bash
+git clone https://github.com/hrniux/insurance-underwriting-agent.git
+cd insurance-underwriting-agent
+./mvnw spring-boot:run
+```
+
+启动后打开 <http://localhost:8080/demo/>，选择 `P-2001` 并点击“运行智能核保”：默认场景应返回 `APPROVE`、`LOW`、10 分。展开规则、知识证据和七步轨迹，可查看结论的来源。
+
+完整测试运行 `./mvnw clean verify`；命令行演示 `bash scripts/demo.sh` 还需要 Bash、curl 和 Python 3。
+
+阅读入口：[场景与学习指南](docs/DEMO_DATA_GUIDE.md) · [架构与设计](docs/ARCHITECTURE.md) · [API 示例](docs/API_EXAMPLES.md)。
+
+核心源码：[七步编排](src/main/java/com/hrniux/underwriting/agent/UnderwritingAgentOrchestrator.java) · [确定性规则](src/main/java/com/hrniux/underwriting/rule/UnderwritingRuleEngine.java) · [知识检索与发布](src/main/java/com/hrniux/underwriting/rag/KnowledgeService.java)。
+
 ## 技术栈
 
 - Java 21、Maven
