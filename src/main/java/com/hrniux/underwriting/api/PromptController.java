@@ -44,8 +44,8 @@ public class PromptController {
             @PathVariable String code,
             @Valid @RequestBody PromptVersionRequest request) {
         PromptTemplateVersion template = prompts.createVersion(code, request.body(), request.requiredVariables());
-        return ResponseEntity.created(URI.create("/api/v1/prompts/%s/versions/%d".formatted(code, template.version())))
-                .body(template);
+        URI location = URI.create("/api/v1/prompts/%s/versions/%d".formatted(template.code(), template.version()));
+        return ResponseEntity.created(location).body(template);
     }
 
     @PostMapping("/{code}/versions/{version}/activate")

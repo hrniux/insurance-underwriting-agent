@@ -11,7 +11,12 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -107,6 +112,54 @@ class UnderwritingTaskServiceTest {
                 new EvaluationRequest(null, "P-1001", "队列已满"), "task-key-rejected"))
                 .isInstanceOf(ServiceCapacityException.class)
                 .hasMessageContaining("at capacity");
+        assertThat(service.list()).isEmpty();
+    }
+
+    @Test
+    void neverAcknowledgesAReplayBeforeItsQueueAdmissionSucceeds() throws Exception {
+        CountDownLatch admissionStarted = new CountDownLatch(1);
+        CountDownLatch rejectAdmission = new CountDownLatch(1);
+        Executor rejecting = ignored -> {
+            admissionStarted.countDown();
+            try {
+                if (!rejectAdmission.await(5, TimeUnit.SECONDS)) {
+                    throw new IllegalStateException("Timed out waiting to reject admission");
+                }
+            }
+            catch (InterruptedException error) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException(error);
+            }
+            throw new RejectedExecutionException("queue full");
+        };
+        UnderwritingTaskService service = service(rejecting);
+        EvaluationRequest request = new EvaluationRequest(null, "P-1001", "concurrent rejected submission");
+        CountDownLatch replayStarted = new CountDownLatch(1);
+
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            var owner = pool.submit(() -> service.submit(request, "rejected-race"));
+            assertThat(admissionStarted.await(5, TimeUnit.SECONDS)).isTrue();
+            var replay = pool.submit(() -> {
+                replayStarted.countDown();
+                return service.submit(request, "rejected-race");
+            });
+            try {
+                assertThat(replayStarted.await(5, TimeUnit.SECONDS)).isTrue();
+                assertThatThrownBy(() -> replay.get(200, TimeUnit.MILLISECONDS))
+                        .isInstanceOf(TimeoutException.class);
+            }
+            finally {
+                rejectAdmission.countDown();
+            }
+
+            assertThatThrownBy(() -> owner.get(10, TimeUnit.SECONDS))
+                    .hasCauseInstanceOf(ServiceCapacityException.class);
+            assertThatThrownBy(() -> replay.get(10, TimeUnit.SECONDS))
+                    .hasCauseInstanceOf(ServiceCapacityException.class);
+        }
+        finally {
+            rejectAdmission.countDown();
+        }
         assertThat(service.list()).isEmpty();
     }
 

@@ -72,32 +72,33 @@ public class UnderwritingTaskService {
 
     public UnderwritingTaskSubmissionResult submit(EvaluationRequest request, String rawIdempotencyKey) {
         SubmissionOutcome outcome = SubmissionOutcome.FAILED;
-        String key = null;
-        UnderwritingTask task = null;
         try {
             Objects.requireNonNull(request, "request must not be null");
-            key = EvaluationIdempotency.normalizeKey(rawIdempotencyKey);
-            TaskClaim claim = claim(request, key);
-            task = claim.task();
-            if (claim.replayed()) {
-                outcome = SubmissionOutcome.REPLAYED;
-                return new UnderwritingTaskSubmissionResult(task, true);
-            }
+            String key = EvaluationIdempotency.normalizeKey(rawIdempotencyKey);
+            // A replay must not acknowledge a reservation before executor admission succeeds.
+            synchronized (idempotency) {
+                TaskClaim claim = claim(request, key);
+                UnderwritingTask task = claim.task();
+                if (claim.replayed()) {
+                    outcome = SubmissionOutcome.REPLAYED;
+                    return new UnderwritingTaskSubmissionResult(task, true);
+                }
 
-            try {
-                String taskId = task.id();
-                executor.execute(() -> run(taskId));
-            }
-            catch (RejectedExecutionException rejected) {
-                rollback(task.id(), key);
-                outcome = SubmissionOutcome.REJECTED;
-                throw new ServiceCapacityException(
-                        "TASK_EXECUTOR_SATURATED",
-                        "Underwriting task executor is at capacity; retry later");
-            }
+                try {
+                    String taskId = task.id();
+                    executor.execute(() -> run(taskId));
+                }
+                catch (RejectedExecutionException rejected) {
+                    rollback(task.id(), key);
+                    outcome = SubmissionOutcome.REJECTED;
+                    throw new ServiceCapacityException(
+                            "TASK_EXECUTOR_SATURATED",
+                            "Underwriting task executor is at capacity; retry later");
+                }
 
-            outcome = SubmissionOutcome.ACCEPTED;
-            return new UnderwritingTaskSubmissionResult(tasks.findById(task.id()).orElse(task), false);
+                outcome = SubmissionOutcome.ACCEPTED;
+                return new UnderwritingTaskSubmissionResult(tasks.findById(task.id()).orElse(task), false);
+            }
         }
         catch (ConflictException conflict) {
             outcome = SubmissionOutcome.CONFLICT;

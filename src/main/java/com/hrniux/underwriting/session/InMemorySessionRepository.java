@@ -19,6 +19,12 @@ public class InMemorySessionRepository implements SessionRepository {
     }
 
     @Override
+    public Optional<UnderwritingSession> appendMessage(String id, SessionMessage message) {
+        return Optional.ofNullable(sessions.computeIfPresent(id,
+                (key, current) -> current.append(message, message.createdAt())));
+    }
+
+    @Override
     public Optional<UnderwritingSession> findById(String id) {
         return Optional.ofNullable(sessions.get(id));
     }

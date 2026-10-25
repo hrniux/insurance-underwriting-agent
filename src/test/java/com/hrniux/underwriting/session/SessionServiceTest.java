@@ -6,6 +6,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.Optional;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -55,6 +60,43 @@ class SessionServiceTest {
     }
 
     @Test
+    void preservesBothMessagesWhenConcurrentAppendsReadTheSameSession() throws Exception {
+        CyclicBarrier bothRead = new CyclicBarrier(2);
+        AtomicBoolean concurrentReads = new AtomicBoolean(true);
+        InMemorySessionRepository repository = new InMemorySessionRepository() {
+            @Override
+            public Optional<UnderwritingSession> findById(String id) {
+                Optional<UnderwritingSession> snapshot = super.findById(id);
+                if (concurrentReads.get()) {
+                    try {
+                        bothRead.await(5, TimeUnit.SECONDS);
+                    }
+                    catch (Exception error) {
+                        throw new IllegalStateException(error);
+                    }
+                }
+                return snapshot;
+            }
+        };
+        SessionService concurrentService = new SessionService(repository);
+        String sessionId = concurrentService.createSession().id();
+
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            var first = pool.submit(() -> concurrentService.appendMessage(sessionId, SessionRole.USER, "first"));
+            var second = pool.submit(() -> concurrentService.appendMessage(sessionId, SessionRole.USER, "second"));
+            first.get(10, TimeUnit.SECONDS);
+            second.get(10, TimeUnit.SECONDS);
+        }
+        finally {
+            concurrentReads.set(false);
+        }
+
+        assertThat(concurrentService.getSession(sessionId).messages())
+                .extracting(SessionMessage::content)
+                .containsExactlyInAnyOrder("first", "second");
+    }
+
+    @Test
     void rejectsBlankMessages() {
         service.createSession();
 
@@ -66,6 +108,10 @@ class SessionServiceTest {
     @Test
     void reportsAnUnknownSession() {
         assertThatThrownBy(() -> service.getSession("SES-MISSING"))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .satisfies(error -> assertThat(((ResourceNotFoundException) error).errorCode())
+                        .isEqualTo("SESSION_NOT_FOUND"));
+        assertThatThrownBy(() -> service.appendMessage("SES-MISSING", SessionRole.USER, "message"))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .satisfies(error -> assertThat(((ResourceNotFoundException) error).errorCode())
                         .isEqualTo("SESSION_NOT_FOUND"));

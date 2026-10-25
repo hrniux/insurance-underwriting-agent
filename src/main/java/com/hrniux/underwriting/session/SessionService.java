@@ -41,9 +41,8 @@ public class SessionService {
     }
 
     public UnderwritingSession appendMessage(String sessionId, SessionRole role, String content) {
-        UnderwritingSession current = getSession(sessionId);
-        Instant now = clock.instant();
-        SessionMessage message = new SessionMessage(role, content, now);
-        return repository.save(current.append(message, now));
+        SessionMessage message = new SessionMessage(role, content, clock.instant());
+        return repository.appendMessage(sessionId, message)
+                .orElseThrow(() -> new ResourceNotFoundException("SESSION_NOT_FOUND", sessionId));
     }
 }
