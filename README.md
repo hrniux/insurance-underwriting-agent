@@ -36,6 +36,18 @@
 - 可选重启恢复：`persistent-demo` Profile 把会话、评估和人工复核切换到 H2 文件库，进程重启后仍可查询；默认 Profile 继续使用内存仓储。
 - 运行指标：Actuator 暴露评估、降级、人工复核、异步任务和决策重演十组低基数 Micrometer 指标。
 
+## 一键可验证 Demo
+
+本机有 JDK 21+、Python 3 和 Bash 时，在仓库根目录运行：
+
+```bash
+bash scripts/run-verified-demo.sh
+```
+
+脚本通过 Maven Wrapper 构建并运行测试，在独立端口 `18080` 启动 Mock 服务，验证四组固定核保结果、七步/六工具轨迹、知识与 Prompt/规则来源、幂等冲突、RAG 黄金集、稳定重演和已保存报告，最后停止自己的进程。原始响应与通过/失败摘要保存在 `target/demo-evidence/<run-id>/`。首次构建需要下载依赖；应用使用虚构数据与确定性 Mock，不代表真实 LLM 质量测试。
+
+端口覆盖、独立验收命令、证据格式及限制见 [可验证 Demo 指南](docs/VERIFIED_DEMO.md)。
+
 ## 快速启动
 
 前提：本机有 Java 21+ 和 Maven 3.9+。
