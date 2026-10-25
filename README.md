@@ -38,11 +38,11 @@
 
 ## 快速启动
 
-前提：本机有 Java 21+ 和 Maven 3.9+。
+前提：本机有完整 JDK 21+。仓库自带 Maven Wrapper，无需全局安装 Maven；首次运行需要联网下载 Maven 和依赖。
 
 ```bash
-mvn clean verify
-mvn spring-boot:run
+./mvnw clean verify
+./mvnw spring-boot:run
 ```
 
 新开终端检查服务：
@@ -102,7 +102,7 @@ curl --fail "http://localhost:8080/api/v1/underwriting/tasks/${task_id}" \
 默认启动不会注入故障。需要面试演示内部灾害平台超时时，启用专用 `degraded-demo` Profile：
 
 ```bash
-SPRING_PROFILES_ACTIVE=degraded-demo mvn spring-boot:run
+SPRING_PROFILES_ACTIVE=degraded-demo ./mvnw spring-boot:run
 ```
 
 然后在 `/demo/` 运行 `P-2001`，或执行：
@@ -151,7 +151,7 @@ Markdown 报告即可看到 Agent 辅助建议与人工最终处理的并列记�
 启用 `persistent-demo` Profile：
 
 ```bash
-SPRING_PROFILES_ACTIVE=persistent-demo mvn spring-boot:run
+SPRING_PROFILES_ACTIVE=persistent-demo ./mvnw spring-boot:run
 ```
 
 首次运行会自动创建 `data/underwriting.mv.db` 及三张表。运行 `bash scripts/demo.sh` 生成评估和人工复核后，
@@ -173,7 +173,7 @@ curl --fail \
 export PERSISTENT_DB_URL='jdbc:h2:file:/tmp/underwriting-demo;DB_CLOSE_ON_EXIT=FALSE'
 export PERSISTENT_DB_USERNAME=sa
 export PERSISTENT_DB_PASSWORD=''
-SPRING_PROFILES_ACTIVE=persistent-demo mvn spring-boot:run
+SPRING_PROFILES_ACTIVE=persistent-demo ./mvnw spring-boot:run
 ```
 
 这个 Profile 是“可证明跨进程持久化”的本地适配器，不是生产数据库方案。它只持久化会话、评估和人工复核；
@@ -216,8 +216,8 @@ SPRING_PROFILES_ACTIVE=persistent-demo mvn spring-boot:run
 
 ## 十分钟学习路线
 
-1. 运行 `mvn clean verify`，确认环境和全部测试正常。
-2. 运行 `mvn spring-boot:run` 启动离线服务。
+1. 运行 `./mvnw clean verify`，确认环境和全部测试正常。
+2. 运行 `./mvnw spring-boot:run` 启动离线服务。
 3. 打开 `/demo/`，先点击“对比全部场景”理解结论分布，再进入一组场景运行详细核保。
 4. 打开 `/api/v1/demo/scenarios` 对照页面数据，再运行 `bash scripts/demo.sh` 观察批量 API 流程。
 5. 对照 [虚构核保数据与十分钟学习指南](docs/DEMO_DATA_GUIDE.md)，从业务事实追踪到规则命中、风险加分和最终决策。
@@ -326,7 +326,7 @@ export LLM_READ_TIMEOUT=15s
 export LLM_MAX_ATTEMPTS=3
 export LLM_RETRY_BACKOFF=100ms
 export LLM_FALLBACK_TO_MOCK=false
-mvn spring-boot:run
+./mvnw spring-boot:run
 ```
 
 只对 I/O 异常、超时、HTTP 429 和 5xx 重试；普通 4xx 不重试。默认禁止静默降级。只有显式设置 `LLM_FALLBACK_TO_MOCK=true` 才回退，并在响应中标记 `fallbackUsed=true`。API Key 只从运行时环境读取，不写日志、不写响应、不写异常。
