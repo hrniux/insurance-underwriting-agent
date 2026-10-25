@@ -1,0 +1,383 @@
+{
+  "checked_on": "2026-10-25",
+  "account": "hrniux",
+  "scope": "面向 Java/Spring、可解释 Agent、RAG 和 Mac 本地开发的精选20项；非 GitHub 全量遍历或客观绝对排名。",
+  "ranking_basis": [
+    "与现有仓库的实际关联",
+    "可复现的应用价值",
+    "维护和发布情况",
+    "开源许可证",
+    "技术路线的互补性"
+  ],
+  "runtime_testing": "本清单仅核查源码、README、LICENSE与维护信息；没有逐一安装运行20个项目。",
+  "star_action": {
+    "status": "blocked",
+    "completed_by_this_task": 0,
+    "error": "GitHub API HTTP 403 Resource not accessible by integration",
+    "detail": "20个仓库的Star状态读取均被当前集成拒绝；对spring-projects/spring-ai的Star写入也被拒绝。现有Star状态未知，不声称全部尚未收藏。",
+    "required_permission": "Starring read and write",
+    "fallback": "bash scripts/star-ai-repos.sh"
+  },
+  "repositories": [
+    {
+      "rank": 1,
+      "repository": "spring-projects/spring-ai",
+      "url": "https://github.com/spring-projects/spring-ai",
+      "license": "Apache-2.0",
+      "value": "Spring 业务应用的模型、RAG、MCP 集成；与你的核保项目直接相关。",
+      "limitations": "2.x 对应 Boot 4.x，按 BOM 对齐版本。",
+      "stars": 9581,
+      "last_push": "2026-10-23T10:11:45Z",
+      "archived": false,
+      "default_branch": "main",
+      "sources": {
+        "metadata": "https://api.github.com/repos/spring-projects/spring-ai",
+        "readme": "https://github.com/spring-projects/spring-ai/blob/main/README.md",
+        "license": "https://github.com/spring-projects/spring-ai/blob/main/LICENSE.txt",
+        "releases": "https://github.com/spring-projects/spring-ai/releases"
+      }
+    },
+    {
+      "rank": 2,
+      "repository": "ollama/ollama",
+      "url": "https://github.com/ollama/ollama",
+      "license": "MIT",
+      "value": "在 Mac 快速启动本地模型 HTTP API。",
+      "limitations": "模型权重许可、下载体积和内存另计。",
+      "stars": 184672,
+      "last_push": "2026-10-24T18:03:30Z",
+      "archived": false,
+      "default_branch": "main",
+      "sources": {
+        "metadata": "https://api.github.com/repos/ollama/ollama",
+        "readme": "https://github.com/ollama/ollama/blob/main/README.md",
+        "license": "https://github.com/ollama/ollama/blob/main/LICENSE",
+        "releases": "https://github.com/ollama/ollama/releases"
+      }
+    },
+    {
+      "rank": 3,
+      "repository": "promptfoo/promptfoo",
+      "url": "https://github.com/promptfoo/promptfoo",
+      "license": "MIT",
+      "value": "为提示词、模型和 Agent 建立可自动判定的回归评测。",
+      "limitations": "云模型及 LLM 判分可能收费。",
+      "stars": 26392,
+      "last_push": "2026-10-25T04:28:37Z",
+      "archived": false,
+      "default_branch": "main",
+      "sources": {
+        "metadata": "https://api.github.com/repos/promptfoo/promptfoo",
+        "readme": "https://github.com/promptfoo/promptfoo/blob/main/README.md",
+        "license": "https://github.com/promptfoo/promptfoo/blob/main/LICENSE",
+        "releases": "https://github.com/promptfoo/promptfoo/releases"
+      }
+    },
+    {
+      "rank": 4,
+      "repository": "langchain-ai/langgraph",
+      "url": "https://github.com/langchain-ai/langgraph",
+      "license": "MIT",
+      "value": "实现可持久化、可恢复、支持人工介入的 Agent 流程。",
+      "limitations": "简单串行流程可能不需要额外编排框架。",
+      "stars": 43847,
+      "last_push": "2026-10-25T00:50:19Z",
+      "archived": false,
+      "default_branch": "main",
+      "sources": {
+        "metadata": "https://api.github.com/repos/langchain-ai/langgraph",
+        "readme": "https://github.com/langchain-ai/langgraph/blob/main/README.md",
+        "license": "https://github.com/langchain-ai/langgraph/blob/main/LICENSE",
+        "releases": "https://github.com/langchain-ai/langgraph/releases"
+      }
+    },
+    {
+      "rank": 5,
+      "repository": "docling-project/docling",
+      "url": "https://github.com/docling-project/docling",
+      "license": "MIT",
+      "value": "将 PDF 版面、表格、OCR 内容转为 RAG 可用资料。",
+      "limitations": "模型许可另查；复杂版面需要验收，CPU 解析可能较慢。",
+      "stars": 69528,
+      "last_push": "2026-10-23T16:01:55Z",
+      "archived": false,
+      "default_branch": "main",
+      "sources": {
+        "metadata": "https://api.github.com/repos/docling-project/docling",
+        "readme": "https://github.com/docling-project/docling/blob/main/README.md",
+        "license": "https://github.com/docling-project/docling/blob/main/LICENSE",
+        "releases": "https://github.com/docling-project/docling/releases"
+      }
+    },
+    {
+      "rank": 6,
+      "repository": "qdrant/qdrant",
+      "url": "https://github.com/qdrant/qdrant",
+      "license": "Apache-2.0",
+      "value": "语义检索、条件过滤与混合搜索的服务化向量数据库。",
+      "limitations": "需要独立服务和 embedding；小数据集不一定需要。",
+      "stars": 35232,
+      "last_push": "2026-10-23T20:34:01Z",
+      "archived": false,
+      "default_branch": "master",
+      "sources": {
+        "metadata": "https://api.github.com/repos/qdrant/qdrant",
+        "readme": "https://github.com/qdrant/qdrant/blob/master/README.md",
+        "license": "https://github.com/qdrant/qdrant/blob/master/LICENSE",
+        "releases": "https://github.com/qdrant/qdrant/releases"
+      }
+    },
+    {
+      "rank": 7,
+      "repository": "modelcontextprotocol/java-sdk",
+      "url": "https://github.com/modelcontextprotocol/java-sdk",
+      "license": "MIT",
+      "value": "用标准协议把 Java 业务能力暴露给多个 AI 客户端。",
+      "limitations": "协议 SDK 本身不提供模型和完整业务应用。",
+      "stars": 3743,
+      "last_push": "2026-10-23T08:21:29Z",
+      "archived": false,
+      "default_branch": "main",
+      "sources": {
+        "metadata": "https://api.github.com/repos/modelcontextprotocol/java-sdk",
+        "readme": "https://github.com/modelcontextprotocol/java-sdk/blob/main/README.md",
+        "license": "https://github.com/modelcontextprotocol/java-sdk/blob/main/LICENSE",
+        "releases": "https://github.com/modelcontextprotocol/java-sdk/releases"
+      }
+    },
+    {
+      "rank": 8,
+      "repository": "ggml-org/llama.cpp",
+      "url": "https://github.com/ggml-org/llama.cpp",
+      "license": "MIT",
+      "value": "GGUF、量化和 Apple Silicon 本地推理的基础组件。",
+      "limitations": "模型与上下文长度决定实际内存占用。",
+      "stars": 132260,
+      "last_push": "2026-10-25T01:44:58Z",
+      "archived": false,
+      "default_branch": "master",
+      "sources": {
+        "metadata": "https://api.github.com/repos/ggml-org/llama.cpp",
+        "readme": "https://github.com/ggml-org/llama.cpp/blob/master/README.md",
+        "license": "https://github.com/ggml-org/llama.cpp/blob/master/LICENSE",
+        "releases": "https://github.com/ggml-org/llama.cpp/releases"
+      }
+    },
+    {
+      "rank": 9,
+      "repository": "huggingface/transformers",
+      "url": "https://github.com/huggingface/transformers",
+      "license": "Apache-2.0",
+      "value": "文本、图像、音频等模型应用与实验的核心生态。",
+      "limitations": "模型许可及计算资源需分别评估。",
+      "stars": 168109,
+      "last_push": "2026-10-25T01:22:36Z",
+      "archived": false,
+      "default_branch": "main",
+      "sources": {
+        "metadata": "https://api.github.com/repos/huggingface/transformers",
+        "readme": "https://github.com/huggingface/transformers/blob/main/README.md",
+        "license": "https://github.com/huggingface/transformers/blob/main/LICENSE",
+        "releases": "https://github.com/huggingface/transformers/releases"
+      }
+    },
+    {
+      "rank": 10,
+      "repository": "langchain4j/langchain4j",
+      "url": "https://github.com/langchain4j/langchain4j",
+      "license": "Apache-2.0",
+      "value": "以 Java 接口、POJO 和注解实现模型调用与工具/RAG集成。",
+      "limitations": "与 Spring AI 有重叠，按项目选主框架。",
+      "stars": 13291,
+      "last_push": "2026-10-23T15:49:17Z",
+      "archived": false,
+      "default_branch": "main",
+      "sources": {
+        "metadata": "https://api.github.com/repos/langchain4j/langchain4j",
+        "readme": "https://github.com/langchain4j/langchain4j/blob/main/README.md",
+        "license": "https://github.com/langchain4j/langchain4j/blob/main/LICENSE",
+        "releases": "https://github.com/langchain4j/langchain4j/releases"
+      }
+    },
+    {
+      "rank": 11,
+      "repository": "ml-explore/mlx-lm",
+      "url": "https://github.com/ml-explore/mlx-lm",
+      "license": "MIT",
+      "value": "Apple Silicon 上的 Python LLM 推理、量化与 LoRA 微调。",
+      "limitations": "主要适用于 Apple Silicon，模型规模受统一内存限制。",
+      "stars": 7467,
+      "last_push": "2026-10-24T00:10:47Z",
+      "archived": false,
+      "default_branch": "main",
+      "sources": {
+        "metadata": "https://api.github.com/repos/ml-explore/mlx-lm",
+        "readme": "https://github.com/ml-explore/mlx-lm/blob/main/README.md",
+        "license": "https://github.com/ml-explore/mlx-lm/blob/main/LICENSE",
+        "releases": "https://github.com/ml-explore/mlx-lm/releases"
+      }
+    },
+    {
+      "rank": 12,
+      "repository": "deepset-ai/haystack",
+      "url": "https://github.com/deepset-ai/haystack",
+      "license": "Apache-2.0",
+      "value": "可组合、可评估的检索、重排和 RAG 流水线。",
+      "limitations": "Python 组件集成，与已有 Java 检索层需明确边界。",
+      "stars": 26831,
+      "last_push": "2026-10-24T10:46:55Z",
+      "archived": false,
+      "default_branch": "main",
+      "sources": {
+        "metadata": "https://api.github.com/repos/deepset-ai/haystack",
+        "readme": "https://github.com/deepset-ai/haystack/blob/main/README.md",
+        "license": "https://github.com/deepset-ai/haystack/blob/main/LICENSE",
+        "releases": "https://github.com/deepset-ai/haystack/releases"
+      }
+    },
+    {
+      "rank": 13,
+      "repository": "huggingface/text-embeddings-inference",
+      "url": "https://github.com/huggingface/text-embeddings-inference",
+      "license": "Apache-2.0",
+      "value": "独立部署 embedding、rerank 服务，为真实 RAG 替换 Hash Embedding。",
+      "limitations": "须选择硬件对应安装路径及模型，额外维护推理服务。",
+      "stars": 5084,
+      "last_push": "2026-10-13T14:33:07Z",
+      "archived": false,
+      "default_branch": "main",
+      "sources": {
+        "metadata": "https://api.github.com/repos/huggingface/text-embeddings-inference",
+        "readme": "https://github.com/huggingface/text-embeddings-inference/blob/main/README.md",
+        "license": "https://github.com/huggingface/text-embeddings-inference/blob/main/LICENSE",
+        "releases": "https://github.com/huggingface/text-embeddings-inference/releases"
+      }
+    },
+    {
+      "rank": 14,
+      "repository": "vllm-project/vllm",
+      "url": "https://github.com/vllm-project/vllm",
+      "license": "Apache-2.0",
+      "value": "面向生产并发和吞吐的模型推理服务。",
+      "limitations": "生产优先服务器加速器环境；Mac 首个 Demo 更适合 Ollama/MLX。",
+      "stars": 95373,
+      "last_push": "2026-10-25T04:21:35Z",
+      "archived": false,
+      "default_branch": "main",
+      "sources": {
+        "metadata": "https://api.github.com/repos/vllm-project/vllm",
+        "readme": "https://github.com/vllm-project/vllm/blob/main/README.md",
+        "license": "https://github.com/vllm-project/vllm/blob/main/LICENSE",
+        "releases": "https://github.com/vllm-project/vllm/releases"
+      }
+    },
+    {
+      "rank": 15,
+      "repository": "pytorch/pytorch",
+      "url": "https://github.com/pytorch/pytorch",
+      "license": "BSD-3-Clause-style",
+      "value": "张量、自动微分和模型训练的长期基础。",
+      "limitations": "应用项目未必需要直接依赖；API标签NOASSERTION，以LICENSE正文为准。",
+      "stars": 105049,
+      "last_push": "2026-10-25T04:29:07Z",
+      "archived": false,
+      "default_branch": "main",
+      "sources": {
+        "metadata": "https://api.github.com/repos/pytorch/pytorch",
+        "readme": "https://github.com/pytorch/pytorch/blob/main/README.md",
+        "license": "https://github.com/pytorch/pytorch/blob/main/LICENSE",
+        "releases": "https://github.com/pytorch/pytorch/releases"
+      }
+    },
+    {
+      "rank": 16,
+      "repository": "microsoft/markitdown",
+      "url": "https://github.com/microsoft/markitdown",
+      "license": "MIT",
+      "value": "低成本将 Office、HTML、PDF 等转换为 LLM 可消费的 Markdown。",
+      "limitations": "不保证复杂版面和扫描件的高保真；视觉/云服务可选且可能收费。",
+      "stars": 191995,
+      "last_push": "2026-10-23T17:04:06Z",
+      "archived": false,
+      "default_branch": "main",
+      "sources": {
+        "metadata": "https://api.github.com/repos/microsoft/markitdown",
+        "readme": "https://github.com/microsoft/markitdown/blob/main/README.md",
+        "license": "https://github.com/microsoft/markitdown/blob/main/LICENSE",
+        "releases": "https://github.com/microsoft/markitdown/releases"
+      }
+    },
+    {
+      "rank": 17,
+      "repository": "openai/openai-agents-python",
+      "url": "https://github.com/openai/openai-agents-python",
+      "license": "MIT",
+      "value": "轻量工具调用、handoff、guardrails、MCP 和 tracing。",
+      "limitations": "默认教程通常需要模型 API；服务费用与 SDK 开源分开。",
+      "stars": 30263,
+      "last_push": "2026-10-22T22:05:38Z",
+      "archived": false,
+      "default_branch": "main",
+      "sources": {
+        "metadata": "https://api.github.com/repos/openai/openai-agents-python",
+        "readme": "https://github.com/openai/openai-agents-python/blob/main/README.md",
+        "license": "https://github.com/openai/openai-agents-python/blob/main/LICENSE",
+        "releases": "https://github.com/openai/openai-agents-python/releases"
+      }
+    },
+    {
+      "rank": 18,
+      "repository": "gradio-app/gradio",
+      "url": "https://github.com/gradio-app/gradio",
+      "license": "Apache-2.0",
+      "value": "把 Python 模型函数快速变成可交互验证的演示界面。",
+      "limitations": "UI 开源不代表后端模型免费；公网分享需显式开启。",
+      "stars": 43875,
+      "last_push": "2026-10-23T22:37:21Z",
+      "archived": false,
+      "default_branch": "main",
+      "sources": {
+        "metadata": "https://api.github.com/repos/gradio-app/gradio",
+        "readme": "https://github.com/gradio-app/gradio/blob/main/README.md",
+        "license": "https://github.com/gradio-app/gradio/blob/main/LICENSE",
+        "releases": "https://github.com/gradio-app/gradio/releases"
+      }
+    },
+    {
+      "rank": 19,
+      "repository": "openai/openai-cookbook",
+      "url": "https://github.com/openai/openai-cookbook",
+      "license": "MIT",
+      "value": "学习结构化输出、RAG 和评测的官方实现配方。",
+      "limitations": "多数示例需要 API Key，需按当前 SDK/模型检查兼容。",
+      "stars": 76798,
+      "last_push": "2026-10-23T21:10:36Z",
+      "archived": false,
+      "default_branch": "main",
+      "sources": {
+        "metadata": "https://api.github.com/repos/openai/openai-cookbook",
+        "readme": "https://github.com/openai/openai-cookbook/blob/main/README.md",
+        "license": "https://github.com/openai/openai-cookbook/blob/main/LICENSE",
+        "releases": "https://github.com/openai/openai-cookbook/releases"
+      }
+    },
+    {
+      "rank": 20,
+      "repository": "vibrantlabsai/ragas",
+      "url": "https://github.com/vibrantlabsai/ragas",
+      "license": "Apache-2.0",
+      "value": "量化 RAG 回答质量、上下文相关性和评测集。",
+      "limitations": "旧地址explodinggradients/ragas已重定向；截至核查最近推送2026-02-24，维护活跃度较低。",
+      "stars": 16143,
+      "last_push": "2026-02-24T07:47:19Z",
+      "archived": false,
+      "default_branch": "main",
+      "sources": {
+        "metadata": "https://api.github.com/repos/vibrantlabsai/ragas",
+        "readme": "https://github.com/vibrantlabsai/ragas/blob/main/README.md",
+        "license": "https://github.com/vibrantlabsai/ragas/blob/main/LICENSE",
+        "releases": "https://github.com/vibrantlabsai/ragas/releases"
+      }
+    }
+  ]
+}
