@@ -388,6 +388,7 @@ async function openSavedEvaluation(evaluationId) {
   resetEvaluation();
   state.detail = null;
   find("#scenario-detail").hidden = true;
+  setEvaluationLoading(false);
   setDetailLoading(false);
   const controller = new AbortController();
   state.savedEvaluationController = controller;
@@ -983,21 +984,8 @@ function updateHistoryReview(review) {
 }
 
 async function restoreHistory(evaluationId) {
-  state.savedEvaluationController?.abort();
-  state.savedEvaluationController = null;
-  const item = state.history.find(entry => entry.id === evaluationId);
-  if (!item) return;
-  if (state.selectedPolicyNo !== item.policyNo || !state.detail) {
-    await selectScenario(item.policyNo);
-  }
-  if (state.detail?.policyNo !== item.policyNo) return;
-  state.evaluation = item.evaluation;
-  state.lastDurationMs = item.durationMs;
-  renderEvaluation(item.evaluation, state.detail.expectedResult, item.durationMs, {
-    record: false,
-    review: item.review
-  });
-  showToast(`已恢复评估 ${item.id}`);
+  if (!state.history.some(entry => entry.id === evaluationId)) return;
+  await openSavedEvaluation(evaluationId);
 }
 
 function clearHistory() {
@@ -1140,7 +1128,7 @@ async function submitHumanReview(event) {
     renderHumanReview(review);
     loadReviewWorklist(state.worklistPage?.page || 0);
   } catch (error) {
-    if (error.name !== "AbortError") {
+    if (state.reviewController === controller && state.evaluation?.id === evaluationId && error.name !== "AbortError") {
       find("#review-status").textContent = `复核提交失败：${text(error.message)}`;
       button.disabled = false;
     }
@@ -1216,7 +1204,7 @@ async function runDecisionReplay() {
     renderDecisionDrift(result.drift);
     find("#decision-drift-result").scrollIntoView({ behavior: "smooth", block: "center" });
   } catch (error) {
-    if (error.name !== "AbortError") {
+    if (state.replayController === controller && state.evaluation?.id === baseline.id && error.name !== "AbortError") {
       find("#decision-replay-status").textContent = `决策重演失败：${text(error.message)}`;
       showError(error.message);
     }
@@ -1462,7 +1450,7 @@ async function selectScenario(policyNo) {
     state.detail = detail;
     renderScenarioDetail(detail);
   } catch (error) {
-    if (error.name !== "AbortError") {
+    if (state.detailController === controller && state.selectedPolicyNo === policyNo && error.name !== "AbortError") {
       find("#detail-status").textContent = `场景加载失败：${text(error.message)}`;
       showError(error.message);
     }
@@ -1507,7 +1495,7 @@ async function runEvaluation() {
     state.lastDurationMs = Math.max(0, Math.round(performance.now() - state.evaluationStartedAt));
     renderEvaluation(evaluation, detail.expectedResult, state.lastDurationMs);
   } catch (error) {
-    if (error.name !== "AbortError") {
+    if (state.evaluationController === controller && state.detail?.policyNo === detail.policyNo && error.name !== "AbortError") {
       find("#evaluation-status").textContent = "核保运行失败，可以直接重试。";
       failLivePipeline(error.message);
       showError(error.message);

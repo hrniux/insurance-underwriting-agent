@@ -46,6 +46,16 @@ mvn clean verify
 mvn spring-boot:run
 ```
 
+修改浏览器演示台后，可用 Node.js 22+ 运行无需额外依赖的行为回归测试；CI 同时执行 Maven 与这组检查：
+
+```bash
+node --test src/test/js/*.test.cjs
+```
+
+可选的真实浏览器回归需在测试环境安装 Playwright 并先启动本地应用：
+`node scripts/test-demo-history.cjs http://localhost:8080`。
+已有 Chromium 可通过 `CHROMIUM_EXECUTABLE_PATH` 指定，不影响应用启动依赖。
+
 新开终端检查服务：
 
 ```bash
@@ -229,6 +239,8 @@ SPRING_PROFILES_ACTIVE=persistent-demo mvn spring-boot:run
 顶部服务状态会调用 Actuator 健康检查并显示浏览器观察到的响应耗时。实时七步状态在请求进行期间明确标记为页面等待进度，服务端返回后会由真实 `stepTraces` 状态与耗时覆盖，避免把前端动画误解成后端流式事件。
 
 工作台不依赖外部字体、图标或前端框架，支持浅色/深色主题、键盘操作、移动端布局和减少动态效果偏好。主题写入浏览器本地存储；评估历史只写入当前标签页的会话存储，不上传额外数据。
+
+本次会话记录是本地快捷入口。恢复时会重新读取服务端原评估和当前人工复核，避免另一标签页已复核后仍显示过期表单；选择历史案件也会取消页面上正在等待的评估结果。默认内存模式重启后，已消失的服务端评估无法从本地历史恢复；页面会明确显示读取失败，并清除旧的复核表单和报告入口。需要跨重启恢复时请使用 `persistent-demo`。
 
 ## 十分钟学习路线
 
